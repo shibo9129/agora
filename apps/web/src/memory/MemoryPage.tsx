@@ -307,7 +307,7 @@ export function MemoryPage() {
 
       {showCfg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCfg(false)}>
-          <div className="card dialog-panel w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="card-pop dialog-panel w-full max-w-lg card-pop p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 font-medium">中央仓库设置</h3>
             <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
               所有同步的记忆和精炼产物（MEMORY.md 根索引）都写入该目录。默认 <code className="font-mono">{cfg?.defaultRoot}</code>；

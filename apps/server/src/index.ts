@@ -29,6 +29,7 @@ import {
 import { localBoundary } from './security.js';
 import { kbRoutes } from './kb.js';
 import { memoryRoutes, hubRoutes } from './memory.js';
+import { ratesRoutes } from './rates.js';
 import { toolRoutes } from './tools.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -94,6 +95,7 @@ app.route('/api/tools', toolRoutes());
 // ── Memory + hub enrollment ───────────────────────────────────────────────
 app.route('/api/memory', memoryRoutes(db));
 app.route('/api/hub', hubRoutes());
+app.route('/api/rates', ratesRoutes());
 
 // ── Static web bundle (production build of apps/web) ─────────────────────
 // Layouts: bundled package → dist/web; dev checkout → apps/web/dist.

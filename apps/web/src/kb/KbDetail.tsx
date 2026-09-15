@@ -71,7 +71,7 @@ function OrganizeDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-y-auto card p-5"
+        className="max-h-[80vh] w-full max-w-lg overflow-y-auto card-pop p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-3 font-medium">整理建议（{subdir || '根目录'}）</h3>

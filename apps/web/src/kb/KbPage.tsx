@@ -35,7 +35,7 @@ function CreateDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-md card p-5"
+        className="w-full max-w-md card-pop p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">

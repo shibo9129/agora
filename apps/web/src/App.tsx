@@ -21,6 +21,7 @@ import { ToolsPage } from './tools/ToolsPage';
 import { MemoryPage } from './memory/MemoryPage';
 import { useCountUp } from './hooks/useCountUp';
 import { SpotlightZone } from './components/SpotlightZone';
+import { AgoraLogo } from './components/AgoraLogo';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { useSettings, CURRENCY_SYMBOLS } from './settings/settings';
 import { getChartTheme, chartTooltipBase, useThemeTick } from './components/chart-theme';
@@ -114,7 +115,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <div className="agora-mark">A</div>
+              <AgoraLogo size={34} />
               <div className="leading-tight">
                 <div className="text-gradient text-[16px] font-bold tracking-tight">Agora</div>
                 <div className="text-[11px] tracking-wide text-[var(--color-ink-faint)]">本地 AI 中枢</div>
@@ -455,22 +456,31 @@ function UsageDashboard() {
         <div className="card p-4">
           <h2 className="section-title mb-3">已检测的 Agent</h2>
           <div className="space-y-1.5">
-            {agents.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel)] px-3 py-2">
-                <div>
-                  <span className="text-sm font-medium">{a.displayName}</span>
-                  <span className="ml-2 text-[11px] text-[var(--color-ink-faint)]">{a.category}</span>
+            {agents
+              .filter((a) => a.presence !== 'absent')
+              .map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel)] px-3 py-2">
+                  <div>
+                    <span className="text-sm font-medium">{a.displayName}</span>
+                    <span className="ml-2 text-[11px] text-[var(--color-ink-faint)]">{a.category}</span>
+                    {a.presence === 'residual' && (
+                      <span className="badge badge-amber ml-2" title="配置目录存在，但应用本体未找到（已卸载或未安装）">
+                        配置残留
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {a.detail && <span className="text-[11px] text-[var(--color-ink-dim)]">{a.detail}</span>}
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${
+                        a.presence === 'installed' ? 'bg-emerald-400' : 'bg-amber-400/70'
+                      }`}
+                      style={a.presence === 'installed' ? { boxShadow: '0 0 6px #34d399' } : undefined}
+                      title={a.presence === 'installed' ? a.configHome : `配置残留：${a.configHome}`}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {a.detail && <span className="text-[11px] text-[var(--color-ink-dim)]">{a.detail}</span>}
-                  <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full ${a.installed ? 'bg-emerald-400' : 'bg-zinc-700'}`}
-                    style={a.installed ? { boxShadow: '0 0 6px #34d399' } : undefined}
-                    title={a.installed ? a.configHome : '未安装'}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </section>

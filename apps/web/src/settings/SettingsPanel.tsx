@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSettings, CURRENCY_SYMBOLS, type CurrencyCode } from './settings';
+import { useSettings, CURRENCY_SYMBOLS, STATIC_FALLBACK_RATES, type CurrencyCode } from './settings';
 
 export const DARK_SKINS = [
   { id: 'aurora', name: '暗夜极光', accent: '#10b981' },
@@ -24,7 +24,7 @@ function Swatch({ color, active, onClick }: { color: string; active: boolean; on
 }
 
 export function SettingsPanel() {
-  const { settings, update } = useSettings();
+  const { settings, update, liveRates } = useSettings();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,6 +36,18 @@ export function SettingsPanel() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  const manualRate = settings.rates[settings.currency];
+  const liveRate = settings.currency === 'USD' ? 1 : liveRates?.rates[settings.currency];
+  const effectiveRate = manualRate ?? liveRate ?? STATIC_FALLBACK_RATES[settings.currency];
+  const rateSource =
+    manualRate !== undefined
+      ? '手动'
+      : liveRates?.source === 'frankfurter'
+        ? '实时'
+        : liveRates?.source === 'cache'
+          ? '缓存'
+          : '兜底';
 
   return (
     <div ref={ref} className="relative">
@@ -52,7 +64,7 @@ export function SettingsPanel() {
       </button>
 
       {open && (
-        <div className="card dialog-panel absolute right-0 top-11 z-50 w-72 p-4">
+        <div className="card-pop dialog-panel absolute right-0 top-11 z-50 w-72 p-4">
           <div className="section-title mb-3">外观</div>
           <div className="mb-3 flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
             {(
@@ -102,23 +114,53 @@ export function SettingsPanel() {
             ))}
           </div>
           {settings.currency !== 'USD' && (
-            <label className="flex items-center justify-between text-xs text-[var(--color-ink-dim)]">
-              1 USD =
+            <div className="flex items-center justify-between text-xs text-[var(--color-ink-dim)]">
+              <span>
+                1 USD = <span className="num font-semibold text-[var(--color-ink)]">{effectiveRate}</span> {settings.currency}
+                <span className="ml-1.5 text-[10px] text-[var(--color-ink-faint)]">
+                  （{rateSource}
+                  {liveRates && liveRates.source !== 'fallback' && rateSource !== '手动'
+                    ? ` · 更新于 ${new Date(liveRates.fetchedAt).toLocaleTimeString()}`
+                    : ''}
+                  ）
+                </span>
+              </span>
               <span className="flex items-center gap-1">
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={settings.rates[settings.currency]}
+                  placeholder={String(liveRate ?? STATIC_FALLBACK_RATES[settings.currency])}
+                  value={manualRate ?? ''}
                   onChange={(e) => {
-                    const v = Number(e.target.value);
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      const next = { ...settings.rates };
+                      delete next[settings.currency];
+                      update({ rates: next });
+                      return;
+                    }
+                    const v = Number(raw);
                     if (v > 0) update({ rates: { ...settings.rates, [settings.currency]: v } });
                   }}
                   className="input-field w-20 !px-2 !py-1 text-right"
+                  title="留空则使用联网实时汇率"
                 />
-                {settings.currency}
+                {manualRate !== undefined && (
+                  <button
+                    onClick={() => {
+                      const next = { ...settings.rates };
+                      delete next[settings.currency];
+                      update({ rates: next });
+                    }}
+                    className="text-[10px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+                    title="清除手动汇率，恢复联网汇率"
+                  >
+                    重置
+                  </button>
+                )}
               </span>
-            </label>
+            </div>
           )}
         </div>
       )}

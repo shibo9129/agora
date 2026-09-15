@@ -51,4 +51,12 @@ export interface AgentDetection {
    * that participate in skill matrices but are not real AI agents.
    */
   kind?: 'agent' | 'virtual';
+  /**
+   * Presence verdict beyond a bare config-dir check:
+   * - 'installed': the app/CLI/daemon itself is present (bin/app/process).
+   * - 'residual': config leftovers exist but the app itself is gone
+   *   (uninstalled or never installed on this machine).
+   * - 'absent': nothing found.
+   */
+  presence?: 'installed' | 'residual' | 'absent';
 }

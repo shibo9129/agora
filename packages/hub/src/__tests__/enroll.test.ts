@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -12,7 +12,14 @@ let memoryRoot: string;
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), 'agora-hub-enroll-'));
-  env = { home: root, env: {} };
+  // Fake CLI binaries so presenceProof sees the agents as installed.
+  const fakeBinDir = join(root, 'fake-bin');
+  mkdirSync(fakeBinDir, { recursive: true });
+  for (const bin of ['codex', 'opencode', 'gemini', 'claude', 'hermes', 'cursor-agent']) {
+    writeFileSync(join(fakeBinDir, bin), '#!/bin/sh\n');
+    chmodSync(join(fakeBinDir, bin), 0o755);
+  }
+  env = { home: root, env: { PATH: `${fakeBinDir}:${process.env['PATH']}` } };
   memoryRoot = join(root, 'memory');
   mkdirSync(join(root, '.codex'), { recursive: true });
   writeFileSync(join(root, '.codex/config.toml'), 'model = "gpt-5.1"\n');

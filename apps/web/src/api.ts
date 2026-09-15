@@ -34,6 +34,8 @@ export interface AgentDetection {
   configHome: string;
   entryFiles: readonly string[];
   detail?: string;
+  /** 'installed' | 'residual' (config leftovers, app gone) | 'absent'. */
+  presence?: 'installed' | 'residual' | 'absent';
 }
 
 export interface CollectionReport {

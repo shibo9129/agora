@@ -78,7 +78,7 @@ function InstallDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md card p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md card-pop p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-medium">安装 Skill 到中央仓库</h3>
         <div className="mb-3 flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
           {(
@@ -428,7 +428,7 @@ function RegistryDialog({ onClose, onInstalled, onError }: { onClose: () => void
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex max-h-[80vh] w-full max-w-2xl flex-col card p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[80vh] w-full max-w-2xl flex-col card-pop p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-medium">MCP 市场（官方 registry）</h3>
         <div className="mb-3 flex gap-2">
           <input

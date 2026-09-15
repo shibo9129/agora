@@ -15,6 +15,7 @@
 :root,
 [data-theme='dark:aurora'] {
   --color-abyss: #06070c;
+  --color-pop: #121218;
   --color-panel: rgb(255 255 255 / 0.025);
   --color-panel-strong: rgb(255 255 255 / 0.05);
   --color-edge: rgb(255 255 255 / 0.07);
@@ -39,6 +40,7 @@
 
 [data-theme='dark:violet'] {
   --color-abyss: #0a0714;
+  --color-pop: #161022;
   --color-panel: rgb(255 255 255 / 0.028);
   --color-panel-strong: rgb(255 255 255 / 0.055);
   --color-edge: rgb(255 255 255 / 0.075);
@@ -63,6 +65,7 @@
 
 [data-theme='dark:ocean'] {
   --color-abyss: #050a12;
+  --color-pop: #0d1420;
   --color-panel: rgb(255 255 255 / 0.025);
   --color-panel-strong: rgb(255 255 255 / 0.05);
   --color-edge: rgb(255 255 255 / 0.07);
@@ -87,6 +90,7 @@
 
 [data-theme='light:paper'] {
   --color-abyss: #f6f7f5;
+  --color-pop: #ffffff;
   --color-panel: rgb(255 255 255 / 0.72);
   --color-panel-strong: rgb(255 255 255 / 0.92);
   --color-edge: rgb(20 24 21 / 0.09);
@@ -111,6 +115,7 @@
 
 [data-theme='light:sand'] {
   --color-abyss: #f7f3ec;
+  --color-pop: #fffdf9;
   --color-panel: rgb(255 255 255 / 0.7);
   --color-panel-strong: rgb(255 255 255 / 0.92);
   --color-edge: rgb(60 45 20 / 0.1);
@@ -135,6 +140,7 @@
 
 [data-theme='light:sky'] {
   --color-abyss: #f1f6fb;
+  --color-pop: #ffffff;
   --color-panel: rgb(255 255 255 / 0.72);
   --color-panel-strong: rgb(255 255 255 / 0.92);
   --color-edge: rgb(15 40 70 / 0.09);
@@ -251,6 +257,15 @@ body::before {
   border-radius: var(--radius-card);
   backdrop-filter: blur(14px);
   box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 20px 50px -20px rgb(0 0 0 / 0.5);
+}
+
+/* Dialogs / popovers need an opaque surface (cards are too translucent). */
+@utility card-pop {
+  position: relative;
+  background: var(--color-pop);
+  border: 1px solid var(--color-edge-strong);
+  border-radius: var(--radius-card);
+  box-shadow: 0 24px 70px -12px rgb(0 0 0 / 0.55), 0 4px 16px rgb(0 0 0 / 0.3);
 }
 
 @utility spotlight {
