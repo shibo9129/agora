@@ -1,0 +1,63 @@
+$ pnpm -r run test
+Scope: 8 of 9 workspace projects
+packages/knowledge test$ vitest run
+packages/memory test$ vitest run
+packages/usage test$ vitest run
+packages/knowledge test:  RUN  v3.2.7 /Users/stanshek/Code/agora/packages/knowledge
+packages/memory test:  RUN  v3.2.7 /Users/stanshek/Code/agora/packages/memory
+packages/usage test:  RUN  v3.2.7 /Users/stanshek/Code/agora/packages/usage
+packages/knowledge test:  ✓ src/__tests__/registry-templates.test.ts (5 tests) 18ms
+packages/knowledge test:  ✓ src/__tests__/indexer-query.test.ts (8 tests) 38ms
+packages/knowledge test:  ✓ src/__tests__/organize.test.ts (5 tests) 58ms
+packages/knowledge test:  Test Files  3 passed (3)
+packages/knowledge test:       Tests  18 passed (18)
+packages/knowledge test:    Start at  17:09:18
+packages/knowledge test:    Duration  1.42s (transform 277ms, setup 0ms, collect 537ms, tests 114ms, environment 0ms, prepare 952ms)
+packages/usage test:  ✓ src/__tests__/pricing.test.ts (11 tests) 20ms
+packages/usage test:  ✓ src/__tests__/opencode.test.ts (5 tests) 41ms
+packages/usage test:  ✓ src/__tests__/claude.test.ts (6 tests) 48ms
+packages/usage test:  ✓ src/__tests__/codex.test.ts (8 tests) 56ms
+packages/usage test:  ✓ src/__tests__/engine.test.ts (6 tests) 177ms
+packages/usage test:  Test Files  5 passed (5)
+packages/usage test:       Tests  36 passed (36)
+packages/usage test:    Start at  17:09:18
+packages/usage test:    Duration  1.76s (transform 535ms, setup 0ms, collect 1.70s, tests 343ms, environment 1ms, prepare 1.48s)
+packages/memory test:  ✓ src/__tests__/store.test.ts (9 tests) 450ms
+packages/memory test:    ✓ uses body revision for conflicts even if frontmatter timestamp is unchanged  338ms
+packages/memory test:  Test Files  1 passed (1)
+packages/memory test:       Tests  9 passed (9)
+packages/memory test:    Start at  17:09:18
+packages/memory test:    Duration  1.89s (transform 99ms, setup 0ms, collect 187ms, tests 450ms, environment 0ms, prepare 238ms)
+packages/knowledge test: Done
+packages/usage test: Done
+packages/memory test: Done
+packages/tools test$ vitest run
+packages/tools test:  RUN  v3.2.7 /Users/stanshek/Code/agora/packages/tools
+packages/tools test:  ✓ src/__tests__/yaml-writer.test.ts (7 tests) 11ms
+packages/tools test:  ✓ src/__tests__/mcp.test.ts (14 tests) 44ms
+packages/tools test:  ✓ src/__tests__/skills.test.ts (6 tests) 46ms
+packages/tools test:  ✓ src/__tests__/install.test.ts (8 tests) 983ms
+packages/tools test:    ✓ install / update / uninstall > detects and applies an update from the remote  388ms
+packages/tools test:  Test Files  4 passed (4)
+packages/tools test:       Tests  35 passed (35)
+packages/tools test:    Start at  17:09:21
+packages/tools test:    Duration  1.76s (transform 293ms, setup 0ms, collect 1.31s, tests 1.08s, environment 1ms, prepare 491ms)
+packages/tools test: Done
+packages/hub test$ vitest run
+packages/hub test:  RUN  v3.2.7 /Users/stanshek/Code/agora/packages/hub
+packages/hub test:  ✓ src/__tests__/mcp-spec.test.ts (3 tests) 5ms
+packages/hub test:  ✓ src/__tests__/blocks.test.ts (6 tests) 17ms
+packages/hub test:  ✓ src/__tests__/enroll.test.ts (4 tests) 27ms
+packages/hub test:  Test Files  3 passed (3)
+packages/hub test:       Tests  13 passed (13)
+packages/hub test:    Start at  17:09:23
+packages/hub test:    Duration  719ms (transform 194ms, setup 0ms, collect 788ms, tests 48ms, environment 1ms, prepare 359ms)
+packages/hub test: Done
+apps/server test$ vitest run
+apps/server test:  RUN  v3.2.7 /Users/stanshek/Code/agora/apps/server
+apps/server test:  ✓ src/__tests__/security.test.ts (2 tests) 6ms
+apps/server test:  Test Files  1 passed (1)
+apps/server test:       Tests  2 passed (2)
+apps/server test:    Start at  17:09:24
+apps/server test:    Duration  422ms (transform 48ms, setup 0ms, collect 69ms, tests 6ms, environment 0ms, prepare 92ms)
+apps/server test: Done

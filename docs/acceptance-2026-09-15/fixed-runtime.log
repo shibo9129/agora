@@ -1,0 +1,6 @@
+packaged HTTP health: {'ok': True, 'name': 'agora', 'version': '0.1.1'}
+foreign browser write: rejected 403
+SIGTERM: port released, no orphan HTTP server
+packaged MCP: initialize, 5 tools, write/read, revision update, stale reject, external edit search PASS
+UI organize/undo file contents: exact restored, wiki markers intact
+package licenses and all frontend files: verified

@@ -1,0 +1,18 @@
+$ pnpm -r run typecheck
+Scope: 8 of 9 workspace projects
+packages/adapters typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+packages/knowledge typecheck$ tsc --noEmit
+packages/memory typecheck$ tsc --noEmit
+packages/adapters typecheck: Done
+packages/usage typecheck$ tsc --noEmit
+packages/memory typecheck: Done
+packages/knowledge typecheck: Done
+apps/web typecheck: Done
+packages/usage typecheck: Done
+packages/tools typecheck$ tsc --noEmit
+packages/tools typecheck: Done
+packages/hub typecheck$ tsc --noEmit
+packages/hub typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/server typecheck: Done

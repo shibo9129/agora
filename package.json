@@ -1,0 +1,27 @@
+{
+  "name": "agora",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Local AI agent hub — unified knowledge bases, skills/MCP management, shared memory, and token usage analytics",
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "bundle": "node scripts/bundle.mjs",
+    "pack": "node scripts/pack.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.7"
+  }
+}

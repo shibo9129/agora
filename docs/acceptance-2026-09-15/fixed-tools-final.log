@@ -1,0 +1,14 @@
+$ vitest run
+
+ RUN  v3.2.7 /Users/stanshek/Code/agora/packages/tools
+
+ ✓ src/__tests__/yaml-writer.test.ts (7 tests) 10ms
+ ✓ src/__tests__/mcp.test.ts (14 tests) 39ms
+ ✓ src/__tests__/skills.test.ts (6 tests) 41ms
+ ✓ src/__tests__/install.test.ts (8 tests) 873ms
+
+ Test Files  4 passed (4)
+      Tests  35 passed (35)
+   Start at  17:17:12
+   Duration  1.67s (transform 275ms, setup 0ms, collect 1.09s, tests 963ms, environment 0ms, prepare 450ms)
+

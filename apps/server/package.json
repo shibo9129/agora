@@ -1,0 +1,50 @@
+{
+  "name": "agora-hub",
+  "version": "0.1.1",
+  "description": "Local AI agent hub — unified knowledge bases, skills/MCP management, shared memory, and token usage analytics",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "agora": "./bin/agora.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "LICENSE-codeburn",
+    "THIRD_PARTY_NOTICES.txt"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "bundle": "node ../../scripts/bundle.mjs",
+    "prepack": "pnpm run bundle",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agora/adapters": "workspace:*",
+    "@agora/hub": "workspace:*",
+    "@agora/knowledge": "workspace:*",
+    "@agora/memory": "workspace:*",
+    "@agora/tools": "workspace:*",
+    "@agora/usage": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "better-sqlite3": "^12.2.0",
+    "hono": "^4.8.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.0"
+  }
+}
