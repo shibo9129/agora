@@ -83,7 +83,7 @@ agora mcp        # stdio MCP server（由 Agent 配置调用，通常无需手�
 从源码开发：
 
 ```bash
-git clone https://github.com/shibo9129/agora.git && cd agora
+git clone https://github.com/stanshek/agora.git && cd agora
 pnpm install
 pnpm --filter @agora/web build     # 构建前端
 pnpm --filter @agora/server dev    # → 打开 http://127.0.0.1:7878
