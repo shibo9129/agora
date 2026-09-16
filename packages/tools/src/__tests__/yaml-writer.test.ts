@@ -7,7 +7,7 @@ provider: custom
 
 mcp_servers:
   api:
-    url: http://10.0.0.1:8080/mcp?token=SECRET
+    url: https://mcp.example.com/mcp?token=SECRET
     timeout: 120
     connect_timeout: 30
   andromeld:

@@ -59,4 +59,10 @@ export interface AgentDetection {
    * - 'absent': nothing found.
    */
   presence?: 'installed' | 'residual' | 'absent';
+  /** True when this adapter declares skill dirs (can receive skill links). */
+  supportsSkills?: boolean;
+  /** True when this adapter declares memory dirs (can feed memory sync). */
+  supportsMemorySync?: boolean;
+  /** True when Agora can write this agent's MCP config file. */
+  mcpWritable?: boolean;
 }

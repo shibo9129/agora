@@ -51,8 +51,12 @@ export async function runHealthChecks(
   // 3. Skill issues.
   const skills = await scanUnifiedSkills(env, adapters);
   for (const skill of skills) {
+    // Dedupe by path: shared dirs (pool, ~/.claude/skills) are scanned for
+    // several agents — one physical link/copy is one issue, not N.
+    const brokenSeen = new Set<string>();
     for (const loc of skill.locations) {
-      if (loc.kind === 'link' && loc.linkOk === false) {
+      if (loc.kind === 'link' && loc.linkOk === false && !brokenSeen.has(loc.path)) {
+        brokenSeen.add(loc.path);
         issues.push({
           kind: 'broken-skill-link',
           severity: 'warn',
@@ -61,13 +65,13 @@ export async function runHealthChecks(
         });
       }
     }
-    const realCount = skill.locations.filter((l) => l.kind === 'real').length;
-    if (realCount > 1) {
-      const where = skill.locations.filter((l) => l.kind === 'real').map((l) => l.agent).join(', ');
+    const realPaths = new Set(skill.locations.filter((l) => l.kind === 'real').map((l) => l.path));
+    if (realPaths.size > 1) {
+      const where = [...new Set(skill.locations.filter((l) => l.kind === 'real').map((l) => l.agent))].join(', ');
       issues.push({
         kind: 'duplicate-skill-real',
         severity: 'warn',
-        message: `skill「${skill.name}」存在 ${realCount} 份实体拷贝（应保留一份，其余用链接）`,
+        message: `skill「${skill.name}」存在 ${realPaths.size} 份实体拷贝（应保留一份，其余用链接）`,
         detail: where,
       });
     }

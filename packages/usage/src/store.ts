@@ -171,8 +171,13 @@ const TOTALS_SQL = `
 
 function sinceClause(days?: number): { sql: string; params: Record<string, string> } {
   if (!days || days <= 0) return { sql: '', params: {} };
-  const since = new Date(Date.now() - days * 86400_000).toISOString();
-  return { sql: 'WHERE ts >= @since', params: { since } };
+  // Calendar-day windows: days=1 means "today since local midnight", days=7
+  // the last 7 calendar days including today — matching tokscale/ccusage and
+  // user intuition for the 今天/7天/30天 labels.
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  return { sql: 'WHERE ts >= @since', params: { since: cutoff.toISOString() } };
 }
 
 export function querySummary(db: Database.Database, days?: number): UsageTotals {
@@ -215,7 +220,7 @@ export function queryDaily(db: Database.Database, days = 30): DailyUsage[] {
   const { sql, params } = sinceClause(days);
   return db
     .prepare(
-      `SELECT substr(ts, 1, 10) AS day, agent, ${TOTALS_SQL}
+      `SELECT date(ts, 'localtime') AS day, agent, ${TOTALS_SQL}
          FROM usage_records ${sql}
         GROUP BY day, agent ORDER BY day ASC`,
     )

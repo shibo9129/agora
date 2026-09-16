@@ -24,13 +24,13 @@ beforeAll(() => {
   );
   writeFileSync(
     join(root, '.codex/memories/raw_memories.md'),
-    '---\nname: 偏好事实\nabstract: 用户偏好先给结论再给依据\n---\n\n沟通风格偏好。',
+    '---\nname: 偏好事实\nabstract: Stan 偏好先给结论再给依据\n---\n\n沟通风格偏好。',
   );
   writeFileSync(join(root, '.codex/memories/MEMORY.md'), '# index (should be skipped)');
   writeFileSync(join(root, '.codex/memories/USER.md.bak'), 'backup, skipped');
   // hermes memories
   mkdirSync(join(root, '.hermes/memories'), { recursive: true });
-  writeFileSync(join(root, '.hermes/memories/USER.md'), '# 用户画像\n\nAlex，软件工程师，喜欢结构化表达。');
+  writeFileSync(join(root, '.hermes/memories/USER.md'), '# 用户画像\n\nStanshek，证券测试工程师，喜欢结构化。');
 });
 
 afterAll(() => {
@@ -58,13 +58,13 @@ describe('syncAgentMemories', () => {
     // abstract comes from the first content paragraph (heading is the title)
     expect(rollout.abstract).toContain('完成了从老流水线到 N12 的迁移');
     const hermes = store.list('synced', 'hermes')[0]!;
-    expect(hermes.abstract).toContain('Alex');
+    expect(hermes.abstract).toContain('Stanshek');
   });
 
   it('uses frontmatter abstract when present', async () => {
     const entries = store.list('synced', 'codex');
     const pref = entries.find((e) => e.name.includes('偏好事实'))!;
-    expect(pref.abstract).toBe('用户偏好先给结论再给依据');
+    expect(pref.abstract).toBe('Stan 偏好先给结论再给依据');
   });
 
   it('is idempotent (same sources overwrite, no duplicates)', async () => {

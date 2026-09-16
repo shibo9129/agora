@@ -89,12 +89,13 @@ function replaceBlock(content: string, blockId: string, body: string): string {
   return `${before}${begin}\n${body.trim()}\n${end}${after}`;
 }
 
-/** Insert or replace a managed block. Creates the file when missing. */
+/** Insert or replace a managed block. Creates the file when missing.
+ *  Noop (no backup, no write) when the block already has identical content. */
 export async function upsertManagedBlock(
   filePath: string,
   blockId: string,
   body: string,
-): Promise<{ action: 'inserted' | 'replaced'; backupPath?: string }> {
+): Promise<{ action: 'inserted' | 'replaced' | 'noop'; backupPath?: string }> {
   const block = `${BEGIN(blockId)}\n${body.trim()}\n${END(blockId)}`;
   if (!existsSync(filePath)) {
     await mkdir(dirname(filePath), { recursive: true });
@@ -103,6 +104,18 @@ export async function upsertManagedBlock(
     return { action: 'inserted' };
   }
   const content = await readFile(filePath, 'utf-8');
+  if (hasManagedBlock(content, blockId)) {
+    const begin = BEGIN(blockId);
+    const end = END(blockId);
+    const startIdx = content.indexOf(begin);
+    const endIdx = content.indexOf(end);
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      const currentBody = content.slice(startIdx + begin.length, endIdx).trim();
+      if (currentBody === body.trim()) {
+        return { action: 'noop' }; // already up to date — leave the file untouched
+      }
+    }
+  }
   const backupPath = await backup(filePath);
   let next: string;
   if (hasManagedBlock(content, blockId)) {

@@ -347,6 +347,20 @@ export class MemoryStore {
     }
     if (groups.length === 0) lines.push('（空）', '');
     await mkdir(this.root, { recursive: true });
-    await this.atomicFile(this.absPath('MEMORY.md'), lines.join('\n'));
+    // When the root points at an EXISTING library (e.g. a user's vault), its
+    // MEMORY.md may not be ours — back it up before overwriting, honoring
+    // the "only touch files Agora manages" contract.
+    const rootIndexPath = this.absPath('MEMORY.md');
+    if (existsSync(rootIndexPath)) {
+      try {
+        const existing = await readFile(rootIndexPath, 'utf-8');
+        if (!existing.includes('由 Agora 自动维护')) {
+          await copyFile(rootIndexPath, `${rootIndexPath}.agora-bak-${Date.now()}`);
+        }
+      } catch {
+        // unreadable — the atomic write below will surface any real error
+      }
+    }
+    await this.atomicFile(rootIndexPath, lines.join('\n'));
   }
 }

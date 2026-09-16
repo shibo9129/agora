@@ -63,6 +63,9 @@ function makeAdapter(def: {
         configHome,
         entryFiles: def.entryFiles,
         presence: installed ? 'installed' : dirExists ? 'residual' : 'absent',
+        supportsSkills: def.skillDirs !== undefined,
+        supportsMemorySync: def.memoryDirs !== undefined,
+        mcpWritable: def.mcpWritable === true,
       };
       if (detail !== undefined) detection.detail = detail;
       if (def.kind !== undefined) detection.kind = def.kind;
@@ -119,7 +122,14 @@ export const opencodeAdapter = makeAdapter({
   configHome: (e) => join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'opencode'),
   presenceProof: async (e) => (await whichBin('opencode', e)) !== null,
   detectDetail: async (dir) => ((await exists(join(dir, 'opencode.jsonc'))) ? 'opencode.jsonc found' : undefined),
-  skillDirs: (e) => [join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'opencode', 'skills')],
+  // OpenCode auto-loads external skills beyond its own dir (from its binary:
+  // "External skills (auto-loaded): ~/.claude/skills, ~/.agents/skills").
+  // Its own dir stays first so toggles write there, never into shared dirs.
+  skillDirs: (e) => [
+    join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'opencode', 'skills'),
+    join(home(e), '.agents', 'skills'),
+    join(environ(e)['CLAUDE_CONFIG_DIR'] ?? join(home(e), '.claude'), 'skills'),
+  ],
   mcpConfig: (e) => ({
     path: join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'opencode', 'opencode.jsonc'),
     format: 'jsonc',
@@ -167,6 +177,34 @@ export const hermesAdapter = makeAdapter({
   mcpWritable: true,
 });
 
+/**
+ * Pi (pi-coding-agent). Its skill roots include the agentDir skills dir AND
+ * the ECC shared pool ~/.agents/skills (user level — the [u] entries in
+ * /skill completion). The pool is listed first so it stays the toggle target:
+ * it is where pi actually resolves user skills today.
+ */
+export const piAdapter = makeAdapter({
+  id: 'pi',
+  displayName: 'Pi',
+  category: 'cli',
+  entryFiles: ['AGENTS.md'],
+  // Pi's agent dir: PI_CODING_AGENT_DIR (default ~/.pi/agent).
+  configHome: (e) => environ(e)['PI_CODING_AGENT_DIR'] ?? join(home(e), '.pi', 'agent'),
+  presenceProof: async (e) => (await whichBin('pi', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'settings.json'))) ? 'settings.json found' : undefined),
+  skillDirs: (e) => [
+    join(home(e), '.agents', 'skills'),
+    join(environ(e)['PI_CODING_AGENT_DIR'] ?? join(home(e), '.pi', 'agent'), 'skills'),
+  ],
+  // Pi has no built-in MCP; users opt in via an MCP extension, which reads
+  // ~/.pi/agent/mcp.json — we manage that file.
+  mcpConfig: (e) => ({
+    path: join(environ(e)['PI_CODING_AGENT_DIR'] ?? join(home(e), '.pi', 'agent'), 'mcp.json'),
+    format: 'json',
+  }),
+  mcpWritable: true,
+});
+
 /** The cross-agent shared skill pool (ECC convention: ~/.agents/skills). */
 export const sharedPoolAdapter = makeAdapter({
   id: 'shared-pool',
@@ -199,6 +237,9 @@ export const builtinAdapters: AgentAdapter[] = [
   geminiCliAdapter,
   cursorAdapter,
   hermesAdapter,
+  // pi precedes the shared pool: they scan the same dir, and location dedup
+  // keeps the first report so pool skills are attributed to the real agent.
+  piAdapter,
   sharedPoolAdapter,
   agoraStoreAdapter,
 ];

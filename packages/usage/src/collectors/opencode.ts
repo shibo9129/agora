@@ -12,14 +12,13 @@
  */
 
 import Database from 'better-sqlite3';
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { billableOutputTokens, calculateCost } from '../pricing/models.js';
 import type { CollectorEnv, UsageCollector, UsageRecord, UsageSource } from '../types.js';
-import { asRecord, parseTimestamp, safeNumber, sanitizeProject } from './shared.js';
+import { asRecord, openSqliteReadonly, parseTimestamp, safeNumber, sanitizeProject } from './shared.js';
 
 const AGENT = 'opencode';
 
@@ -29,25 +28,6 @@ function getDataDir(env?: CollectorEnv): string {
   if (environ['OPENCODE_DATA_DIR']) return environ['OPENCODE_DATA_DIR'];
   const xdg = environ['XDG_DATA_HOME'] ?? join(home, '.local', 'share');
   return join(xdg, 'opencode');
-}
-
-function openReadonly(dbPath: string): Database.Database {
-  try {
-    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    db.pragma('busy_timeout = 1000');
-    return db;
-  } catch {
-    // Readonly open can fail on a live WAL db in a non-writable directory.
-    // Fall back to querying a private copy (main file + WAL sidecar).
-    const dir = join(tmpdir(), 'agora-sqlite-ro');
-    mkdirSync(dir, { recursive: true });
-    const copy = join(dir, `opencode-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.db`);
-    copyFileSync(dbPath, copy);
-    if (existsSync(`${dbPath}-wal`)) copyFileSync(`${dbPath}-wal`, `${copy}-wal`);
-    const db = new Database(copy, { readonly: true, fileMustExist: true });
-    db.pragma('busy_timeout = 1000');
-    return db;
-  }
 }
 
 function hasSchema(db: Database.Database): boolean {
@@ -273,7 +253,7 @@ export const opencodeCollector: UsageCollector = {
   },
 
   async *parse(source: UsageSource): AsyncGenerator<UsageRecord> {
-    const db = openReadonly(source.path);
+    const db = openSqliteReadonly(source.path, 'opencode');
     try {
       if (!hasSchema(db)) return;
       const sessions = db

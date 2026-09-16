@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -79,7 +79,6 @@ describe('memory store', () => {
   });
 
   it('rebuilds the index from disk with zero loss (index is a cache)', async () => {
-    // Simulate a file written out-of-band + a wiped index.
     mkdirSync(join(dir, 'global/facts'), { recursive: true });
     writeFileSync(
       join(dir, 'global/facts/oob.md'),
@@ -95,6 +94,22 @@ describe('memory store', () => {
     expect(hits.some((h) => h.name === 'oob')).toBe(true);
     // Previously indexed entries are back too.
     expect(store.search('本地绑定').length).toBeGreaterThan(0);
+  });
+
+  it('backs up a pre-existing non-Agora MEMORY.md before overwriting', async () => {
+    writeFileSync(join(dir, 'MEMORY.md'), '# 用户自己的根索引\n\n重要内容，不应被覆盖。\n');
+    await store.rebuildRootIndex();
+    const bak = readdirSync(dir).find((f) => f.startsWith('MEMORY.md.agora-bak-'));
+    expect(bak).toBeDefined();
+    expect(readFileSync(join(dir, bak!), 'utf-8')).toContain('用户自己的根索引');
+    expect(readFileSync(join(dir, 'MEMORY.md'), 'utf-8')).toContain('由 Agora 自动维护');
+  });
+
+  it('does NOT back up again when MEMORY.md is already Agora-managed', async () => {
+    const before = readdirSync(dir).filter((f) => f.startsWith('MEMORY.md.agora-bak-')).length;
+    await store.rebuildRootIndex();
+    const after = readdirSync(dir).filter((f) => f.startsWith('MEMORY.md.agora-bak-')).length;
+    expect(after).toBe(before);
   });
 });
 

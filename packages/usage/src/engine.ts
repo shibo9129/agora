@@ -10,7 +10,9 @@ import type Database from 'better-sqlite3';
 
 import { claudeCollector } from './collectors/claude.js';
 import { codexCollector } from './collectors/codex.js';
+import { hermesCollector } from './collectors/hermes.js';
 import { opencodeCollector } from './collectors/opencode.js';
+import { piCollector } from './collectors/pi.js';
 import {
   getCollectorFingerprint,
   insertRecords,
@@ -19,7 +21,7 @@ import {
 import type { CollectorEnv, UsageCollector, UsageRecord } from './types.js';
 import { fingerprint, sameFingerprint } from './collectors/shared.js';
 
-export const builtinCollectors: UsageCollector[] = [claudeCollector, codexCollector, opencodeCollector];
+export const builtinCollectors: UsageCollector[] = [claudeCollector, codexCollector, opencodeCollector, hermesCollector, piCollector];
 
 export interface SourceReport {
   agent: string;
@@ -92,7 +94,10 @@ export async function runCollection(db: Database.Database, options: RunOptions =
           batch.push(record);
         }
         const { inserted, duplicates } = insertRecords(db, batch, source.path, true);
-        if (fp) setCollectorFingerprint(db, source.path, collector.agent, fp, batch.length);
+        // Never pin a fingerprint on a zero-yield parse: a transient bug or
+        // unsupported format variant would otherwise mark the file "done"
+        // forever. Zero-yield sources are retried on the next run instead.
+        if (fp && batch.length > 0) setCollectorFingerprint(db, source.path, collector.agent, fp, batch.length);
         report.sources.push({
           agent: collector.agent,
           sourcePath: source.path,

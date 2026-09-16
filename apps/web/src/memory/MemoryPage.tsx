@@ -3,11 +3,13 @@ import { memoryApi, type HubAgentStatus, type MemoryConfig, type MemoryDocument,
 
 function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
   const [agents, setAgents] = useState<HubAgentStatus[]>([]);
+  const [autoEnroll, setAutoEnroll] = useState<boolean | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const r = await memoryApi.hubStatus();
+    const [r, cfg] = await Promise.all([memoryApi.hubStatus(), memoryApi.config()]);
     setAgents(r.agents);
+    setAutoEnroll(cfg.autoEnroll);
   }, []);
 
   useEffect(() => {
@@ -28,8 +30,37 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
     }
   };
 
+  const toggleAutoEnroll = async (enabled: boolean) => {
+    try {
+      const next = await memoryApi.saveConfig({ autoEnroll: enabled });
+      setAutoEnroll(next.autoEnroll);
+      onToast(enabled ? '自动接入已开启：新检测到的 Agent 将在中枢启动时自动完成接入' : '自动接入已关闭（已接入的保持不动）');
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-3">
+        <div>
+          <div className="text-sm font-medium">自动接入本地 Agent</div>
+          <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+            开启后：中枢启动时自动检测本地已安装的 Agent 并完成接入（注册 MCP + 注入指引，全程幂等、自动备份）。
+          </p>
+        </div>
+        <button
+          onClick={() => void toggleAutoEnroll(!(autoEnroll ?? true))}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${(autoEnroll ?? true) ? 'bg-emerald-500' : 'bg-zinc-600'}`}
+          role="switch"
+          aria-checked={autoEnroll ?? true}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${(autoEnroll ?? true) ? 'translate-x-5' : 'translate-x-0.5'}`}
+          />
+        </button>
+      </div>
       <p className="text-sm text-[var(--color-ink-dim)]">
         一键接入 = ① 把 Agora MCP server 注册进 Agent 配置（自动备份）② 在入口文件注入记忆使用指引（受管区块，可干净移除）。
       </p>
@@ -162,6 +193,16 @@ export function MemoryPage() {
       setShowCfg(false);
       showToast(`中央仓库已切换：${next.rootPath}（索引已重建）`);
       await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const saveInterval = async (minutes: number) => {
+    try {
+      const next = await memoryApi.saveConfig({ syncIntervalMinutes: minutes });
+      setCfg((prev) => (prev ? { ...prev, syncIntervalMinutes: next.syncIntervalMinutes } : prev));
+      showToast(`同步间隔已设为 ${next.syncIntervalMinutes} 分钟${next.autoSync ? '（定时任务已重启）' : '（开启自动同步后生效）'}`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e));
     }
@@ -307,7 +348,7 @@ export function MemoryPage() {
 
       {showCfg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowCfg(false)}>
-          <div className="card-pop dialog-panel w-full max-w-lg card-pop p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="card-pop dialog-panel w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-2 font-medium">中央仓库设置</h3>
             <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
               所有同步的记忆和精炼产物（MEMORY.md 根索引）都写入该目录。默认 <code className="font-mono">{cfg?.defaultRoot}</code>；
@@ -316,13 +357,45 @@ export function MemoryPage() {
             <input
               value={cfgPath}
               onChange={(e) => setCfgPath(e.target.value)}
-              className="input-field mb-3 w-full font-mono text-xs"
+              className="input-field mb-4 w-full font-mono text-xs"
               placeholder="/Users/you/path/to/memory"
             />
+            <div className="mb-4">
+              <div className="section-title mb-2">自动同步间隔</div>
+              <div className="flex flex-wrap items-center gap-2">
+                {[5, 10, 30, 60].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => void saveInterval(m)}
+                    className={cfg?.syncIntervalMinutes === m ? 'nav-tab nav-tab-active' : 'nav-tab border border-[var(--color-edge)]'}
+                  >
+                    {m} 分钟
+                  </button>
+                ))}
+                <span className="flex items-center gap-1 text-xs text-[var(--color-ink-dim)]">
+                  自定义
+                  <input
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={cfg?.syncIntervalMinutes ?? 10}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v) && v >= 1 && v <= 1440) void saveInterval(Math.round(v));
+                    }}
+                    className="input-field w-16 !px-2 !py-1 text-center"
+                  />
+                  分钟
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-[var(--color-ink-faint)]">
+                需开启「自动同步」才生效；同步只读取各 Agent 记忆做精炼复制，不会修改 Agent 原有记忆文件。
+              </p>
+            </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCfg(false)} className="btn-ghost">取消</button>
+              <button onClick={() => setShowCfg(false)} className="btn-ghost">关闭</button>
               <button onClick={() => void saveRootPath()} disabled={!cfgPath.trim()} className="btn-primary">
-                保存并重建索引
+                保存路径并重建索引
               </button>
             </div>
           </div>

@@ -55,8 +55,17 @@ export async function setSkillEnabled(
   if (!skill) throw new SkillToggleError(`未知 skill: ${skillName}`);
 
   const existing = skill.locations.find((l) => l.agent === agentId);
-  if (enable && existing && existing.kind === 'real') {
-    return { skill: skillName, agent: agentId, action: 'noop', detail: '该 agent 已有实体安装' };
+  if (enable && existing) {
+    if (existing.kind === 'real') {
+      return { skill: skillName, agent: agentId, action: 'noop', detail: '该 agent 已有实体安装' };
+    }
+    if (existing.linkOk !== false) {
+      // A healthy link already serves this agent — recreating it could point
+      // the link at itself when the agent's dir IS the skill's real home
+      // (e.g. pi and the shared pool).
+      return { skill: skillName, agent: agentId, action: 'noop', detail: '已启用（链接已存在）' };
+    }
+    // Broken link: fall through and repair it.
   }
   if (!enable && !existing) {
     return { skill: skillName, agent: agentId, action: 'noop', detail: '本未启用' };
@@ -66,6 +75,9 @@ export async function setSkillEnabled(
     if (!skill.realLocation) throw new SkillToggleError(`skill ${skillName} 没有实体位置可链接`);
     await mkdir(targetDir, { recursive: true });
     const linkPath = join(targetDir, skillName);
+    if (skill.realLocation.path === linkPath) {
+      throw new SkillToggleError(`skill ${skillName} 在 ${agentId} 的目录下只有链接、没有实体，无法在此创建链接`);
+    }
     const { present } = await isSkillPresent(targetDir, skillName);
     if (present) {
       // Replace stale/broken link only.

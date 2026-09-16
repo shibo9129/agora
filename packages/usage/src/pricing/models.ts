@@ -66,6 +66,13 @@ const BUILTIN_ALIASES: Record<string, string> = {
   'claude-sonnet-4.5': 'claude-sonnet-4-5',
   'claude-opus-4.5': 'claude-opus-4-5',
   'claude-opus-4.1': 'claude-opus-4-1',
+  'claude-opus': 'claude-opus-latest',
+  // Short model ids reported by OpenCode/Hermes gateways for Moonshot models.
+  k3: 'kimi-k3',
+  'k3-256k': 'kimi-k3',
+  'kimi-for-coding': 'kimi-k3',
+  'k2.7-code': 'kimi-k2.7-code',
+  'k2.6-code': 'kimi-k2.6',
 };
 
 /**

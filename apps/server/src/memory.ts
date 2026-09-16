@@ -14,6 +14,13 @@ import { MemoryStore, defaultMemoryRoot, syncAgentMemories, type MemoryScope, ty
 interface HubConfig {
   memoryRoot?: string;
   autoSync: boolean;
+  /** Auto-sync interval in minutes (default 10, min 1, max 1440). */
+  syncIntervalMinutes?: number;
+  /**
+   * Auto-enroll installed agents on server start (register hub MCP + inject
+   * the guide block). Default ON; set false to manage enrollment manually.
+   */
+  autoEnroll?: boolean;
 }
 
 function configPath(): string {
@@ -25,23 +32,34 @@ export function readHubConfig(): HubConfig {
   try {
     const raw = readFileSync(configPath(), 'utf-8');
     const parsed = JSON.parse(raw) as Partial<HubConfig>;
-    return { autoSync: parsed.autoSync === true, ...(parsed.memoryRoot ? { memoryRoot: parsed.memoryRoot } : {}) };
+    const out: HubConfig = { autoSync: parsed.autoSync === true };
+    if (parsed.memoryRoot) out.memoryRoot = parsed.memoryRoot;
+    if (typeof parsed.syncIntervalMinutes === 'number' && parsed.syncIntervalMinutes >= 1) {
+      out.syncIntervalMinutes = Math.min(parsed.syncIntervalMinutes, 1440);
+    }
+    if (parsed.autoEnroll !== undefined) out.autoEnroll = parsed.autoEnroll === true;
+    return out;
   } catch {
     return { autoSync: false };
   }
 }
+
+export const DEFAULT_SYNC_INTERVAL_MINUTES = 10;
+
+/** Live memory-root accessor shared with hubRoutes (set by memoryRoutes). */
+let activeMemoryRoot: () => string = () => defaultMemoryRoot();
 
 function writeHubConfig(config: HubConfig): void {
   mkdirSync(dirname(configPath()), { recursive: true });
   writeFileSync(configPath(), JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
-const AUTOSYNC_INTERVAL_MS = 10 * 60 * 1000;
-
 export function memoryRoutes(db: Database.Database): Hono {
   const app = new Hono();
   let config = readHubConfig();
   let store = new MemoryStore(db, config.memoryRoot ?? defaultMemoryRoot());
+  // Share the live root with hubRoutes' enroll endpoint (config may change it).
+  activeMemoryRoot = () => store.root;
   let timer: ReturnType<typeof setInterval> | null = null;
   let syncing: Promise<Awaited<ReturnType<typeof syncAgentMemories>>> | null = null;
 
@@ -71,27 +89,69 @@ export function memoryRoutes(db: Database.Database): Hono {
     }
     if (enabled) {
       void runSync();
-      timer = setInterval(() => void runSync().catch(() => null), AUTOSYNC_INTERVAL_MS);
+      const intervalMs = (config.syncIntervalMinutes ?? DEFAULT_SYNC_INTERVAL_MINUTES) * 60 * 1000;
+      timer = setInterval(() => void runSync().catch(() => null), intervalMs);
       timer.unref();
     }
   };
 
-  // Kick the rule blocks on boot when autoSync is on.
+  // Auto-enroll: on server start, enroll every installed & writable agent
+  // that isn't fully enrolled yet. Idempotent (noop when already enrolled).
+  const runAutoEnroll = async (): Promise<{ enrolled: string[]; already: string[]; skipped: string[] }> => {
+    const result = { enrolled: [] as string[], already: [] as string[], skipped: [] as string[] };
+    if (config.autoEnroll === false) return result;
+    const statuses = await hubStatus();
+    for (const s of statuses) {
+      if (!s.enrollable) {
+        result.skipped.push(s.agent);
+        continue;
+      }
+      if (s.mcpRegistered && s.entryBlockPresent) {
+        result.already.push(s.agent);
+        continue;
+      }
+      try {
+        await enrollAgent(s.agent, store.root);
+        result.enrolled.push(s.agent);
+      } catch {
+        result.skipped.push(s.agent);
+      }
+    }
+    if (result.enrolled.length > 0) {
+      console.log(`[agora] 自动接入: ${result.enrolled.join(', ')}`);
+    }
+    return result;
+  };
+
+  // Kick the rule blocks on boot when autoSync is on, and auto-enroll agents.
   if (config.autoSync) {
     void applyAutoSync(true);
   }
+  void runAutoEnroll();
 
   app.get('/config', (c) =>
     c.json({
       rootPath: store.root,
       defaultRoot: defaultMemoryRoot(),
       autoSync: config.autoSync,
+      syncIntervalMinutes: config.syncIntervalMinutes ?? DEFAULT_SYNC_INTERVAL_MINUTES,
+      autoEnroll: config.autoEnroll !== false,
     }),
   );
 
   app.put('/config', async (c) => {
-    const body = await c.req.json<{ rootPath?: string; autoSync?: boolean }>();
+    const body = await c.req.json<{ rootPath?: string; autoSync?: boolean; syncIntervalMinutes?: number; autoEnroll?: boolean }>();
     const next: HubConfig = { autoSync: body.autoSync ?? config.autoSync };
+    if (body.autoEnroll !== undefined) next.autoEnroll = body.autoEnroll;
+    else if (config.autoEnroll !== undefined) next.autoEnroll = config.autoEnroll;
+    if (body.syncIntervalMinutes !== undefined) {
+      if (!Number.isFinite(body.syncIntervalMinutes) || body.syncIntervalMinutes < 1 || body.syncIntervalMinutes > 1440) {
+        return c.json({ error: 'syncIntervalMinutes 需在 1-1440 分钟之间' }, 400);
+      }
+      next.syncIntervalMinutes = Math.round(body.syncIntervalMinutes);
+    } else if (config.syncIntervalMinutes !== undefined) {
+      next.syncIntervalMinutes = config.syncIntervalMinutes;
+    }
     const newRoot = body.rootPath?.trim();
     if (newRoot !== undefined && newRoot.length > 0) {
       if (newRoot !== store.root && existsSync(newRoot) === false) {
@@ -103,16 +163,28 @@ export function memoryRoutes(db: Database.Database): Hono {
     }
     const rootChanged = next.memoryRoot !== undefined && next.memoryRoot !== store.root;
     const syncChanged = next.autoSync !== config.autoSync;
+    const intervalChanged = next.syncIntervalMinutes !== config.syncIntervalMinutes;
+    const enrollTurnedOn = body.autoEnroll === true && config.autoEnroll === false;
     config = next;
     writeHubConfig(config);
     if (rootChanged) {
       store = new MemoryStore(db, config.memoryRoot!);
       await store.reindex();
     }
-    if (syncChanged || rootChanged) {
+    if (syncChanged || rootChanged || (intervalChanged && config.autoSync)) {
       await applyAutoSync(config.autoSync);
     }
-    return c.json({ rootPath: store.root, autoSync: config.autoSync });
+    let enrollReport: { enrolled: string[]; already: string[]; skipped: string[] } | undefined;
+    if (enrollTurnedOn) {
+      enrollReport = await runAutoEnroll();
+    }
+    return c.json({
+      rootPath: store.root,
+      autoSync: config.autoSync,
+      syncIntervalMinutes: config.syncIntervalMinutes ?? DEFAULT_SYNC_INTERVAL_MINUTES,
+      autoEnroll: config.autoEnroll !== false,
+      ...(enrollReport !== undefined ? { enrollReport } : {}),
+    });
   });
 
   app.post('/sync', async (c) => c.json(await runSync()));
@@ -178,7 +250,7 @@ export function hubRoutes(): Hono {
     const body = await c.req.json<{ agent?: string }>();
     if (!body.agent) return c.json({ error: 'agent 必填' }, 400);
     try {
-      return c.json(await enrollAgent(body.agent, defaultMemoryRoot()));
+      return c.json(await enrollAgent(body.agent, activeMemoryRoot()));
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
     }

@@ -18,15 +18,15 @@ let env: { home: string; env: NodeJS.ProcessEnv };
 
 const OPENCODE_JSONC = `{
   // 用户的 opencode 配置（注释必须保留）
-  "model": "demo-provider/demo-model",
+  "model": "example-ai-coding/k3",
   "mcp": {
     "api": {
       "type": "local",
       "command": ["node", "api-mcp.js"] // 行尾注释也要保留
     },
-    "horus": {
+    "remote-hub": {
       "type": "remote",
-      "url": "http://10.0.0.1:8321/mcp?token=SECRET123"
+      "url": "https://mcp.example.com/mcp?token=SECRET123"
     }
   }
 }
@@ -36,7 +36,7 @@ const CODEX_TOML = `# Codex 配置（注释必须保留）
 model = "gpt-5.1"
 
 [mcp_servers.api]
-url = "http://10.0.0.1:8321/mcp-servers/api-mcp-doc?token=SECRET456"
+url = "https://mcp.example.com/mcp-servers/api-mcp-doc?token=SECRET456"
 startup_timeout_sec = 20
 
 [mcp_servers.docs]
@@ -65,7 +65,7 @@ describe('mcp scan', () => {
     const servers = await scanUnifiedMcpServers(env, builtinAdapters);
     const names = servers.map((s) => s.name);
     expect(names).toContain('api');
-    expect(names).toContain('horus');
+    expect(names).toContain('remote-hub');
     expect(names).toContain('docs');
     const api = servers.find((s) => s.name === 'api')!;
     expect(api.registrations.length).toBe(2); // opencode + codex
@@ -96,12 +96,12 @@ describe('jsonc writer', () => {
     expect(next).toContain('"new-server"');
     expect(next).toContain('http://example.com/mcp');
     // existing entries untouched
-    expect(next).toContain('"horus"');
+    expect(next).toContain('"remote-hub"');
   });
 
   it('removes a server entry', () => {
-    const next = setJsoncMcpServer(OPENCODE_JSONC, 'horus', null);
-    expect(next).not.toContain('"horus"');
+    const next = setJsoncMcpServer(OPENCODE_JSONC, 'remote-hub', null);
+    expect(next).not.toContain('"remote-hub"');
     expect(next).toContain('"api"');
     expect(next).toContain('// 用户的 opencode 配置（注释必须保留）');
   });

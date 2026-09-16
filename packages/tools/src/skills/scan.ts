@@ -126,6 +126,10 @@ export async function scanUnifiedSkills(
   }
 
   for (const skill of byName.values()) {
+    // Note: the same path may legitimately appear under several agents — the
+    // shared pool (~/.agents/skills) and ~/.claude/skills are read by multiple
+    // agents (pi, OpenCode). Locations are kept per-agent on purpose; health
+    // checks dedupe by path when counting copies.
     // Source of truth preference: Agora store (hub-installed) > shared pool >
     // any other real location > whatever exists.
     skill.realLocation =

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatBytes, kbApi, type KnowledgeBase, type KbTemplate } from './api';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 function CreateDialog({
   templates,
@@ -119,6 +120,8 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
   const [templates, setTemplates] = useState<KbTemplate[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<KnowledgeBase | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = async () => {
     try {
@@ -136,6 +139,21 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
   }, []);
 
   const cards = useMemo(() => kbs, [kbs]);
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    setRemoving(true);
+    try {
+      await kbApi.remove(pendingRemove.id);
+      setPendingRemove(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setPendingRemove(null);
+    } finally {
+      setRemoving(false);
+    }
+  };
 
   return (
     <div>
@@ -161,14 +179,36 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((kb) => (
-            <button
+            <div
               key={kb.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onOpenKb(kb)}
-              className="card p-4 text-left transition-colors hover:border-zinc-600"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenKb(kb);
+                }
+              }}
+              className="card cursor-pointer p-4 text-left transition-colors hover:border-[var(--color-edge-strong)]"
             >
               <div className="mb-1 flex items-center justify-between">
                 <span className="font-medium">{kb.name}</span>
-                {kb.template && <span className="rounded bg-[var(--color-panel-strong)] px-1.5 py-0.5 text-[10px] text-[var(--color-ink-dim)]">{kb.template}</span>}
+                <span className="flex items-center gap-1.5">
+                  {kb.template && <span className="rounded bg-[var(--color-panel-strong)] px-1.5 py-0.5 text-[10px] text-[var(--color-ink-dim)]">{kb.template}</span>}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingRemove(kb);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="rounded-md px-1.5 py-0.5 text-xs text-[var(--color-ink-faint)] hover:text-red-400"
+                    title="移除注册（不删除本地文件）"
+                    aria-label={`移除 ${kb.name} 的注册`}
+                  >
+                    ✕
+                  </button>
+                </span>
               </div>
               <div className="mb-3 truncate font-mono text-xs text-[var(--color-ink-dim)]" title={kb.rootPath}>
                 {kb.rootPath}
@@ -178,12 +218,31 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
                 <span>{kb.fileCount} 文件</span>
                 <span>{kb.dirCount} 目录</span>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
 
       {showDialog && <CreateDialog templates={templates} onClose={() => setShowDialog(false)} onCreated={() => void load()} />}
+
+      {pendingRemove && (
+        <ConfirmDialog
+          title="移除知识库注册"
+          body={
+            <>
+              仅从 Agora 移除 <span className="font-medium text-[var(--color-ink)]">{pendingRemove.name}</span> 的注册与索引。
+              <br />
+              本地目录 <span className="font-mono text-xs text-[var(--color-ink)]">{pendingRemove.rootPath}</span>{' '}
+              及其全部文件<strong>不会被删除</strong>，之后可随时重新注册。
+            </>
+          }
+          confirmLabel="移除注册"
+          danger
+          busy={removing}
+          onConfirm={() => void confirmRemove()}
+          onClose={() => setPendingRemove(null)}
+        />
+      )}
     </div>
   );
 }

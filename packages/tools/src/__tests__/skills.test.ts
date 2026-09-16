@@ -46,6 +46,9 @@ describe('skill scan', () => {
     expect(alpha.description).toBe('Alpha skill');
     expect(alpha.locations.some((l) => l.agent === 'shared-pool' && l.kind === 'real')).toBe(true);
     expect(alpha.locations.some((l) => l.agent === 'claude-code' && l.kind === 'link')).toBe(true);
+    // Shared paths are reported for every agent that reads them (pi, OpenCode).
+    expect(alpha.locations.some((l) => l.agent === 'pi' && l.path.includes('.agents/skills'))).toBe(true);
+    expect(alpha.locations.some((l) => l.agent === 'opencode' && l.path.includes('.agents/skills'))).toBe(true);
     expect(alpha.realLocation!.agent).toBe('shared-pool');
   });
 
@@ -72,8 +75,26 @@ describe('skill toggle', () => {
   });
 
   it('is a noop when enabling a real install', async () => {
-    const r = await setSkillEnabled('alpha', 'shared-pool', true, env, builtinAdapters);
+    const r = await setSkillEnabled('alpha', 'pi', true, env, builtinAdapters);
     expect(r.action).toBe('noop');
+  });
+
+  it('is a noop when a healthy link already exists for that agent', async () => {
+    // alpha is already linked into .claude/skills (see fixture)
+    const r = await setSkillEnabled('alpha', 'claude-code', true, env, builtinAdapters);
+    expect(r.action).toBe('noop');
+    expect(r.detail).toContain('已启用');
+  });
+
+  it('refuses to create a self-referential link inside the skill\'s own home', async () => {
+    // A broken link inside the pool whose only "location" is that link itself.
+    const delta = join(root, '.agents/skills/delta');
+    symlinkSync(join(root, '.agents/skills/missing-ghost-x'), delta, 'dir');
+    try {
+      await expect(setSkillEnabled('delta', 'pi', true, env, builtinAdapters)).rejects.toThrow('没有实体');
+    } finally {
+      rmSync(delta, { force: true });
+    }
   });
 
   it('refuses to remove a real install (data protection)', async () => {

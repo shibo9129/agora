@@ -54,7 +54,11 @@ describe('collection engine', () => {
 
   it('second run skips unchanged sources (fingerprint)', { timeout: 60000 }, async () => {
     const report = await runCollection(db, fixtureEnv());
-    expect(report.sources.every((s) => s.status === 'unchanged')).toBe(true);
+    // Sources that yielded records are fingerprint-skipped; zero-yield
+    // sources (e.g. the empty opencode dir) are re-scanned instead of being
+    // pinned — both are valid, and nothing new is inserted either way.
+    expect(report.sources.every((s) => s.status === 'unchanged' || s.status === 'collected')).toBe(true);
+    expect(report.sources.filter((s) => s.status === 'unchanged').length).toBeGreaterThan(0);
     expect(report.totals.inserted).toBe(0);
   });
 

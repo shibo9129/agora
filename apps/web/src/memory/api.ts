@@ -35,6 +35,8 @@ export interface MemoryConfig {
   rootPath: string;
   defaultRoot: string;
   autoSync: boolean;
+  syncIntervalMinutes: number;
+  autoEnroll: boolean;
 }
 
 export interface AgentSyncStat {
@@ -79,7 +81,7 @@ export const memoryApi = {
   enroll: (agent: string) => req<unknown>('/api/hub/enroll', json({ agent })),
   unenroll: (agent: string) => req<unknown>('/api/hub/unenroll', json({ agent })),
   config: () => req<MemoryConfig>('/api/memory/config'),
-  saveConfig: (input: { rootPath?: string; autoSync?: boolean }) =>
-    req<{ rootPath: string; autoSync: boolean }>('/api/memory/config', { method: 'PUT', ...json(input) }),
+  saveConfig: (input: { rootPath?: string; autoSync?: boolean; syncIntervalMinutes?: number; autoEnroll?: boolean }) =>
+    req<{ rootPath: string; autoSync: boolean; syncIntervalMinutes: number; autoEnroll: boolean }>('/api/memory/config', { method: 'PUT', ...json(input) }),
   sync: () => req<SyncReport>('/api/memory/sync', { method: 'POST' }),
 };

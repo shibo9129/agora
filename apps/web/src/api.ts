@@ -36,6 +36,12 @@ export interface AgentDetection {
   detail?: string;
   /** 'installed' | 'residual' (config leftovers, app gone) | 'absent'. */
   presence?: 'installed' | 'residual' | 'absent';
+  /** Adapter declares skill dirs (can receive skill links). */
+  supportsSkills?: boolean;
+  /** Adapter declares memory dirs (can feed memory sync). */
+  supportsMemorySync?: boolean;
+  /** Agora can write this agent's MCP config. */
+  mcpWritable?: boolean;
 }
 
 export interface CollectionReport {
@@ -90,10 +96,16 @@ export const AGENT_LABELS: Record<string, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   opencode: 'OpenCode',
+  'gemini-cli': 'Gemini CLI',
+  hermes: 'Hermes',
+  pi: 'Pi',
 };
 
 export const AGENT_COLORS: Record<string, string> = {
   'claude-code': '#d97757',
   codex: '#10a37f',
   opencode: '#6366f1',
+  'gemini-cli': '#4285f4',
+  hermes: '#f59e0b',
+  pi: '#ec4899',
 };

@@ -6,10 +6,12 @@
  */
 
 import { createReadStream } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import Database from 'better-sqlite3';
 import type { FileFingerprint } from '../types.js';
 
 export function expandHome(p: string, home: string = homedir()): string {
@@ -71,4 +73,26 @@ export function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : null;
+}
+
+/**
+ * Open a live SQLite DB read-only. Falls back to querying a private copy
+ * (main file + WAL sidecar) when readonly open fails on a live WAL db in a
+ * non-writable directory.
+ */
+export function openSqliteReadonly(dbPath: string, label: string): Database.Database {
+  try {
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    db.pragma('busy_timeout = 1000');
+    return db;
+  } catch {
+    const dir = join(tmpdir(), 'agora-sqlite-ro');
+    mkdirSync(dir, { recursive: true });
+    const copy = join(dir, `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.db`);
+    copyFileSync(dbPath, copy);
+    if (existsSync(`${dbPath}-wal`)) copyFileSync(`${dbPath}-wal`, `${copy}-wal`);
+    const db = new Database(copy, { readonly: true, fileMustExist: true });
+    db.pragma('busy_timeout = 1000');
+    return db;
+  }
 }
