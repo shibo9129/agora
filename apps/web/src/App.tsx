@@ -7,9 +7,9 @@ import {
   formatUSD,
   type AgentBreakdown,
   type AgentDetection,
+  type HourlyUsage,
   type CollectionReport,
   type DailyUsage,
-  type HourlyUsage,
   type ModelBreakdown,
   type ProjectBreakdown,
   type UsageTotals,
@@ -24,9 +24,64 @@ import { useCountUp } from './hooks/useCountUp';
 import { useHubEvents } from './hooks/useHubEvents';
 import { SpotlightZone } from './components/SpotlightZone';
 import { AgoraLogo } from './components/AgoraLogo';
+import { Sidebar, type PageId } from './components/Sidebar';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { useSettings, CURRENCY_SYMBOLS } from './settings/settings';
 import { getChartTheme, chartTooltipBase, useThemeTick } from './components/chart-theme';
+
+export default function App() {
+  const [page, setPage] = useState<PageId>(() => {
+    const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+    return h === 'kb' || h === 'tools' || h === 'memory' ? h : 'usage';
+  });
+  const [openKb, setOpenKb] = useState<KnowledgeBase | null>(null);
+
+  // Deep-link: #/kb/<id> opens a kb detail directly.
+  useEffect(() => {
+    const h = window.location.hash.replace(/^#\/?/, '');
+    if (h.startsWith('kb/')) {
+      const id = h.slice(3);
+      void import('./kb/api').then(({ kbApi }) =>
+        kbApi.list().then(({ kbs }) => {
+          const found = kbs.find((k) => k.id === id);
+          if (found) {
+            setPage('kb');
+            setOpenKb(found);
+          }
+        }),
+      );
+    }
+  }, []);
+
+  const goto = useCallback((p: PageId) => {
+    setPage(p);
+    setOpenKb(null);
+    window.location.hash = p === 'usage' ? '/' : `/${p}`;
+  }, []);
+
+  const openKbDetail = useCallback((kb: KnowledgeBase) => {
+    setOpenKb(kb);
+    window.location.hash = `/kb/${kb.id}`;
+  }, []);
+
+  const backToKbList = useCallback(() => {
+    setOpenKb(null);
+    window.location.hash = '/kb';
+  }, []);
+
+  return (
+    <div className="app-shell">
+      <Sidebar page={page} onNavigate={goto} />
+      <main key={`${page}${openKb?.id ?? ''}`} className="page-enter app-main">
+        {page === 'usage' && <UsageDashboard />}
+        {page === 'kb' && !openKb && <KbPage onOpenKb={openKbDetail} />}
+        {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={backToKbList} />}
+        {page === 'tools' && <ToolsPage />}
+        {page === 'memory' && <MemoryPage />}
+      </main>
+    </div>
+  );
+}
 
 const DAY_OPTIONS = [
   { label: '今天', value: 1 },
@@ -103,105 +158,6 @@ function StatCard({
         {spark && <Sparkline data={spark} color={accent} />}
       </div>
       {sub && <div className="mt-2.5 text-[11px] leading-relaxed text-[var(--color-ink-dim)]">{sub}</div>}
-    </div>
-  );
-}
-
-export default function App() {
-  const [page, setPage] = useState<'usage' | 'kb' | 'tools' | 'memory'>(() => {
-    const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
-    return h === 'kb' || h === 'tools' || h === 'memory' ? h : 'usage';
-  });
-  const [openKb, setOpenKb] = useState<KnowledgeBase | null>(null);
-  const [version, setVersion] = useState('');
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then((d: { version?: string }) => setVersion(d.version ?? ''))
-      .catch(() => {});
-  }, []);
-
-  // Deep-link: #/kb/<id> opens a kb detail directly.
-  useEffect(() => {
-    const h = window.location.hash.replace(/^#\/?/, '');
-    if (h.startsWith('kb/')) {
-      const id = h.slice(3);
-      void import('./kb/api').then(({ kbApi }) =>
-        kbApi.list().then(({ kbs }) => {
-          const found = kbs.find((k) => k.id === id);
-          if (found) {
-            setPage('kb');
-            setOpenKb(found);
-          }
-        }),
-      );
-    }
-  }, []);
-
-  const goto = useCallback((p: 'usage' | 'kb' | 'tools' | 'memory') => {
-    setPage(p);
-    setOpenKb(null);
-    window.location.hash = p === 'usage' ? '/' : `/${p}`;
-  }, []);
-
-  const openKbDetail = useCallback((kb: KnowledgeBase) => {
-    setOpenKb(kb);
-    window.location.hash = `/kb/${kb.id}`;
-  }, []);
-
-  const backToKbList = useCallback(() => {
-    setOpenKb(null);
-    window.location.hash = '/kb';
-  }, []);
-
-  return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-[var(--color-edge)] bg-[var(--header-bg)] backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <AgoraLogo size={34} />
-              <div className="leading-tight">
-                <div className="text-gradient text-[16px] font-bold tracking-tight">Agora</div>
-                <div className="text-[11px] tracking-wide text-[var(--color-ink-faint)]">本地 AI 中枢</div>
-              </div>
-            </div>
-            <nav className="flex gap-1 rounded-2xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1.5">
-              {(
-                [
-                  ['usage', '用量看板'],
-                  ['kb', '知识库'],
-                  ['tools', '工具中心'],
-                  ['memory', '记忆中枢'],
-                ] as const
-              ).map(([p, label]) => (
-                <button
-                  key={p}
-                  onClick={() => goto(p)}
-                  className={page === p ? 'nav-tab nav-tab-active' : 'nav-tab'}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-[var(--color-edge)] bg-[var(--color-panel)] px-2.5 py-1 text-[10px] tracking-wider text-[var(--color-ink-faint)]">
-              {version ? `v${version}` : '…'}
-            </span>
-            <SettingsPanel />
-          </div>
-        </div>
-      </header>
-
-      <main key={`${page}${openKb?.id ?? ''}`} className="page-enter mx-auto max-w-6xl px-6 py-8">
-        {page === 'usage' && <UsageDashboard />}
-        {page === 'kb' && !openKb && <KbPage onOpenKb={openKbDetail} />}
-        {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={backToKbList} />}
-        {page === 'tools' && <ToolsPage />}
-        {page === 'memory' && <MemoryPage />}
-      </main>
     </div>
   );
 }

@@ -21,12 +21,22 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg"],
+    "targets": ["app", "dmg"],
     "externalBin": ["sidecar/node-runtime"],
     "resources": ["sidecar/dist", "sidecar/node_modules"],
     "macOS": {
       "minimumSystemVersion": "12.0"
     },
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"]
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "RWTfGaCxH97+qNfP5iAa1SfiC2mooRVyfCSi0KZyLaqkKCtmvaRJG+dY",
+      "endpoints": ["https://github.com/stanshek/agora/releases/latest/download/update.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

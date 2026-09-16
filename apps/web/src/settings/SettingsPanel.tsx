@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSettings, CURRENCY_SYMBOLS, STATIC_FALLBACK_RATES, type CurrencyCode } from './settings';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 
 export const DARK_SKINS = [
   { id: 'aurora', name: '暗夜极光', accent: '#10b981' },
@@ -162,7 +163,43 @@ export function SettingsPanel() {
               </span>
             </div>
           )}
+
+          <div className="header-rule my-3" />
+          <div className="section-title mb-2">应用更新</div>
+          <UpdateBlock />
         </div>
+      )}
+    </div>
+  );
+}
+
+function UpdateBlock() {
+  const { state, check, install, isTauri } = useAppUpdater();
+
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <div className="text-[var(--color-ink-dim)]">
+        {state.status === 'idle' && (isTauri ? '检查应用更新' : '浏览器/开发模式')}
+        {state.status === 'checking' && '检查中…'}
+        {state.status === 'available' && <span className="text-emerald-400">发现新版本 {state.version}</span>}
+        {state.status === 'downloading' && `下载中 ${state.percent}%`}
+        {state.status === 'installing' && '安装中…'}
+        {state.status === 'done' && '完成，重启生效'}
+        {state.status === 'uptodate' && '已是最新'}
+        {state.status === 'error' && <span className="text-red-400">{state.message.slice(0, 40)}</span>}
+      </div>
+      {state.status === 'available' ? (
+        <button onClick={() => void install()} className="btn-primary !px-3 !py-1 text-xs">
+          立即更新
+        </button>
+      ) : (
+        <button
+          onClick={() => void check()}
+          disabled={state.status === 'checking' || state.status === 'downloading' || state.status === 'installing'}
+          className="btn-ghost !px-3 !py-1 text-xs"
+        >
+          检查更新
+        </button>
       )}
     </div>
   );

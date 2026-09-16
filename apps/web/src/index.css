@@ -562,3 +562,118 @@ body::before {
 .glow-dot {
   box-shadow: 0 0 8px currentColor;
 }
+
+/* ── macOS-style app shell: sidebar + content ───────────────────────────── */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 26px 28px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 208px;
+  flex-shrink: 0;
+  padding: 14px 10px 12px;
+  background: color-mix(in srgb, var(--color-panel) 60%, transparent);
+  border-right: 1px solid var(--color-edge);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px 12px;
+}
+.sidebar-brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+.sidebar-brand-sub {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  letter-spacing: 0.02em;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+.sidebar-section {
+  padding: 6px 9px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-ink-faint);
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--color-ink-dim);
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+.sidebar-item:hover {
+  background: var(--color-panel-strong);
+  color: var(--color-ink);
+}
+.sidebar-item-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  opacity: 0.75;
+}
+.sidebar-item-active,
+.sidebar-item-active:hover {
+  background: color-mix(in srgb, var(--color-brand) 16%, transparent);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.sidebar-item-active .sidebar-item-icon {
+  color: var(--color-brand);
+  opacity: 1;
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 0;
+  border-top: 1px solid var(--color-edge);
+}
+.sidebar-version {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* macOS-restrained primary button: solid accent, no glow */
+.btn-primary {
+  background: var(--color-brand) !important;
+  box-shadow: none !important;
+  border-radius: 7px !important;
+  padding: 6px 13px !important;
+  font-size: 12.5px !important;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08) !important;
+  box-shadow: none !important;
+}
