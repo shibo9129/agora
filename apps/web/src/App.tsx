@@ -111,6 +111,14 @@ export default function App() {
     return h === 'kb' || h === 'tools' || h === 'memory' ? h : 'usage';
   });
   const [openKb, setOpenKb] = useState<KnowledgeBase | null>(null);
+  const [version, setVersion] = useState('');
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d: { version?: string }) => setVersion(d.version ?? ''))
+      .catch(() => {});
+  }, []);
 
   // Deep-link: #/kb/<id> opens a kb detail directly.
   useEffect(() => {
@@ -147,7 +155,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-[var(--color-edge)] bg-[#06070c]/70 backdrop-blur-2xl">
+      <header className="sticky top-0 z-40 border-b border-[var(--color-edge)] bg-[var(--header-bg)] backdrop-blur-2xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -178,7 +186,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-[var(--color-edge)] bg-[var(--color-panel)] px-2.5 py-1 text-[10px] tracking-wider text-[var(--color-ink-faint)]">
-              v0.1.0
+              {version ? `v${version}` : '…'}
             </span>
             <SettingsPanel />
           </div>

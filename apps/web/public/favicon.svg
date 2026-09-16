@@ -5,12 +5,18 @@
       <stop offset="45%" stop-color="#5eead4"/>
       <stop offset="100%" stop-color="#0d9488"/>
     </radialGradient>
+    <linearGradient id="agora-columns" x1="24" y1="6" x2="24" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="60%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#0e7490"/>
+    </linearGradient>
   </defs>
-  <g stroke-linecap="round">
-    <path d="M 24 7 A 17 17 0 0 1 37.03 34.93" stroke="#34d399" stroke-width="4.8"/>
-    <path d="M 36.12 31 A 14 14 0 0 1 10.84 28.79" stroke="#14b8a6" stroke-width="4.2"/>
-    <path d="M 15.06 30.05 A 11.6 11.6 0 0 1 26.08 12.5" stroke="#06b6d4" stroke-width="3.6"/>
-  </g>
-  <circle cx="24" cy="24" r="5.1" fill="url(#agora-hub)"/>
-  <circle cx="22.5" cy="22.3" r="1.5" fill="#ffffff" fill-opacity="0.95"/>
+  <path d="M14 40 L20.5 11" stroke="url(#agora-columns)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M34 40 L27.5 11" stroke="url(#agora-columns)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M11.5 40.8 L17 40.8" stroke="#2dd4a4" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M31 40.8 L36.5 40.8" stroke="#14909e" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M17 8 L31 8" stroke="url(#agora-columns)" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M17.8 27 L30.2 27" stroke="url(#agora-columns)" stroke-width="4.2" stroke-linecap="round"/>
+  <circle cx="24" cy="20.5" r="4.6" fill="url(#agora-hub)"/>
+  <circle cx="22.8" cy="19.1" r="1.2" fill="#ffffff" fill-opacity="0.95"/>
 </svg>

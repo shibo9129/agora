@@ -24,6 +24,9 @@
   --color-ink: #f6f7f9;
   --color-ink-dim: #9c9ca8;
   --color-ink-faint: #5d5d6a;
+  --header-bg: rgb(6 7 12 / 0.7);
+  --input-bg: rgb(0 0 0 / 0.35);
+  --input-bg-focus: rgb(0 0 0 / 0.45);
   --glow-1: rgb(124 58 237 / 0.13);
   --glow-2: rgb(16 185 129 / 0.09);
   --glow-3: rgb(6 182 212 / 0.07);
@@ -49,6 +52,9 @@
   --color-ink: #f5f3fa;
   --color-ink-dim: #a09ab5;
   --color-ink-faint: #615a78;
+  --header-bg: rgb(10 7 20 / 0.7);
+  --input-bg: rgb(0 0 0 / 0.35);
+  --input-bg-focus: rgb(0 0 0 / 0.45);
   --glow-1: rgb(139 92 246 / 0.16);
   --glow-2: rgb(217 70 239 / 0.08);
   --glow-3: rgb(99 102 241 / 0.08);
@@ -74,6 +80,9 @@
   --color-ink: #f2f7fb;
   --color-ink-dim: #96a3b3;
   --color-ink-faint: #586576;
+  --header-bg: rgb(5 10 18 / 0.7);
+  --input-bg: rgb(0 0 0 / 0.35);
+  --input-bg-focus: rgb(0 0 0 / 0.45);
   --glow-1: rgb(14 165 233 / 0.13);
   --glow-2: rgb(6 182 212 / 0.09);
   --glow-3: rgb(59 130 246 / 0.07);
@@ -89,6 +98,7 @@
 }
 
 [data-theme='light:paper'] {
+  color-scheme: light;
   --color-abyss: #f6f7f5;
   --color-pop: #ffffff;
   --color-panel: rgb(255 255 255 / 0.72);
@@ -99,6 +109,9 @@
   --color-ink: #171a18;
   --color-ink-dim: #4f564f;
   --color-ink-faint: #8a9189;
+  --header-bg: rgb(246 247 245 / 0.78);
+  --input-bg: rgb(255 255 255 / 0.75);
+  --input-bg-focus: rgb(255 255 255 / 0.95);
   --glow-1: rgb(16 185 129 / 0.08);
   --glow-2: rgb(124 58 237 / 0.05);
   --glow-3: rgb(6 182 212 / 0.05);
@@ -114,6 +127,7 @@
 }
 
 [data-theme='light:sand'] {
+  color-scheme: light;
   --color-abyss: #f7f3ec;
   --color-pop: #fffdf9;
   --color-panel: rgb(255 255 255 / 0.7);
@@ -124,6 +138,9 @@
   --color-ink: #1f1a13;
   --color-ink-dim: #5c5240;
   --color-ink-faint: #948a73;
+  --header-bg: rgb(247 243 236 / 0.78);
+  --input-bg: rgb(255 255 255 / 0.75);
+  --input-bg-focus: rgb(255 255 255 / 0.95);
   --glow-1: rgb(217 119 6 / 0.09);
   --glow-2: rgb(234 179 8 / 0.06);
   --glow-3: rgb(249 115 22 / 0.05);
@@ -139,6 +156,7 @@
 }
 
 [data-theme='light:sky'] {
+  color-scheme: light;
   --color-abyss: #f1f6fb;
   --color-pop: #ffffff;
   --color-panel: rgb(255 255 255 / 0.72);
@@ -149,6 +167,9 @@
   --color-ink: #101c28;
   --color-ink-dim: #46586c;
   --color-ink-faint: #7e92a8;
+  --header-bg: rgb(241 246 251 / 0.78);
+  --input-bg: rgb(255 255 255 / 0.75);
+  --input-bg-focus: rgb(255 255 255 / 0.95);
   --glow-1: rgb(2 132 199 / 0.09);
   --glow-2: rgb(14 165 233 / 0.06);
   --glow-3: rgb(99 102 241 / 0.05);
@@ -399,7 +420,7 @@ body::before {
 @utility input-field {
   border-radius: 11px;
   border: 1px solid var(--color-edge);
-  background: rgb(0 0 0 / 0.35);
+  background: var(--input-bg);
   padding: 8px 12px;
   font-size: 13px;
   color: var(--color-ink);
@@ -410,7 +431,7 @@ body::before {
   }
   &:focus {
     border-color: rgb(16 185 129 / 0.6);
-    background: rgb(0 0 0 / 0.45);
+    background: var(--input-bg-focus);
     box-shadow: 0 0 0 3.5px rgb(16 185 129 / 0.15);
   }
 }
@@ -533,7 +554,7 @@ body::before {
 /* ── Misc ───────────────────────────────────────────────────────────────── */
 .header-rule {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.08) 25%, rgb(255 255 255 / 0.08) 75%, transparent);
+  background: linear-gradient(90deg, transparent, var(--color-edge-strong) 25%, var(--color-edge-strong) 75%, transparent);
 }
 
 .glow-dot {

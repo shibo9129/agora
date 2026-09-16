@@ -1,5 +1,9 @@
 /** Tool center API client. */
 
+import type { AgentDetection } from '../api';
+
+export type { AgentDetection };
+
 export interface SkillLocation {
   agent: string;
   path: string;
@@ -92,6 +96,7 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export const toolsApi = {
+  agents: () => req<{ agents: AgentDetection[] }>('/api/agents'),
   skills: () => req<{ skills: UnifiedSkill[] }>('/api/tools/skills'),
   toggleSkill: (name: string, agent: string, enable: boolean) =>
     req<{ action: string; detail: string }>(`/api/tools/skills/${encodeURIComponent(name)}/toggle`, json({ agent, enable })),

@@ -1,7 +1,9 @@
 /**
- * Agora logo: three streams of decreasing radius spiraling clockwise into
- * a glowing hub — the pinwheel conveys many agents converging into one
- * center. Readable from 16px favicon to 36px nav mark.
+ * Agora logo: the letter A as a Greek temple façade — two doric columns
+ * (flared bases) carrying an architrave, with a glowing hearth in the
+ * open plaza between them. Agora = the gathering square of ancient
+ * Greece; the mark is its initial and its architecture in one.
+ * Readable from 16px favicon to 36px nav mark.
  */
 export function AgoraLogo({ size = 36 }: { size?: number }) {
   return (
@@ -19,31 +21,28 @@ export function AgoraLogo({ size = 36 }: { size?: number }) {
           <stop offset="45%" stopColor="#5eead4" />
           <stop offset="100%" stopColor="#0d9488" />
         </radialGradient>
+        <linearGradient id="agora-columns" x1="24" y1="6" x2="24" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#6ee7b7" />
+          <stop offset="60%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#0e7490" />
+        </linearGradient>
       </defs>
 
-      {/* Spiral streams: radius 17 → 14 → 11, each sweeping 130°,
-          staggered 120° apart — a converging pinwheel. */}
-      <g strokeLinecap="round">
-        <path
-          d="M 24 7 A 17 17 0 0 1 37.03 34.93"
-          stroke="#34d399"
-          strokeWidth="4.8"
-        />
-        <path
-          d="M 36.12 31 A 14 14 0 0 1 10.84 28.79"
-          stroke="#14b8a6"
-          strokeWidth="4.2"
-        />
-        <path
-          d="M 15.06 30.05 A 11.6 11.6 0 0 1 26.08 12.5"
-          stroke="#06b6d4"
-          strokeWidth="3.6"
-        />
-      </g>
+      {/* Two doric columns (the legs of A) */}
+      <path d="M14 40 L20.5 11" stroke="url(#agora-columns)" strokeWidth="5" strokeLinecap="round" />
+      <path d="M34 40 L27.5 11" stroke="url(#agora-columns)" strokeWidth="5" strokeLinecap="round" />
 
-      {/* The hub */}
-      <circle cx="24" cy="24" r="5.1" fill="url(#agora-hub)" />
-      <circle cx="22.5" cy="22.3" r="1.5" fill="#ffffff" fillOpacity="0.95" />
+      {/* Flared column bases */}
+      <path d="M11.5 40.8 L17 40.8" stroke="#2dd4a4" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M31 40.8 L36.5 40.8" stroke="#14909e" strokeWidth="3.2" strokeLinecap="round" />
+
+      {/* Architrave (the top beam) and the crossbar */}
+      <path d="M17 8 L31 8" stroke="url(#agora-columns)" strokeWidth="4.6" strokeLinecap="round" />
+      <path d="M17.8 27 L30.2 27" stroke="url(#agora-columns)" strokeWidth="4.2" strokeLinecap="round" />
+
+      {/* The glowing hearth in the open plaza */}
+      <circle cx="24" cy="20.5" r="4.6" fill="url(#agora-hub)" />
+      <circle cx="22.8" cy="19.1" r="1.2" fill="#ffffff" fillOpacity="0.95" />
     </svg>
   );
 }
