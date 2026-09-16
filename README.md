@@ -42,7 +42,8 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 | 🗂 **知识库** | 注册或按模板新建目录 → **treemap 透视**（CleanMyMac 式钻取）+ 文件名搜索（FTS5 中文友好）+ 按类型整理（可撤销）+ 一键在 Finder 打开 |
 | 🧰 **工具中心** | skill 统一视图 + 跨 Agent 开关矩阵（symlink 分发，**实体永不被移动**）；MCP 统一视图 + 配置漂移检测；官方 registry 市场一键安装；Git 安装 skill 到中央仓库并联网更新 |
 | 🧠 **记忆中枢** | 一键同步各 Agent 的记忆到中央仓库（**Markdown 为唯一事实源**，SQLite 只是可删索引）；自动同步模式会写入同步规则到各 Agent 入口文件并定时汇聚 |
-| 🔌 **一键接入** | 把 Agora MCP server 注册进 Agent 配置 + 在入口文件注入使用指引（受管区块，全程可逆，写前自动 `.bak` 备份） |
+| ⚡ **开箱即采集** | 装完打开即有数据——app 启动自动建立 server 并后台采集各 Agent 历史用量，无需任何手动配置 |
+| 🔌 **自动接入** | 把 Agora MCP server 注册进 Agent 配置 + 在入口文件注入使用指引（受管区块，全程可逆，写前自动 `.bak` 备份） |
 | 🎨 **主题系统** | 跟随系统自动切换深浅色，深色 × 3 / 浅色 × 3 套皮肤，任意皮肤都可深链接分享 |
 
 ## 📸 界面一览
@@ -67,18 +68,30 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
   <em>记忆中枢 · 跨 Agent 共享记忆，按来源（codex / opencode / webui）分组</em>
 </p>
 
-## 🚀 快速开始
+## 🚀 快速开始（macOS App，即装即用）
+
+1. 下载 **[最新 release](https://github.com/stanshek/agora/releases)** 里的 `Agora_<版本>_aarch64.dmg`
+2. 打开 dmg，把 **Agora.app** 拖进 `/Applications`
+3. 在终端执行一次（清除下载隔离属性，只需一次）：
+
+   ```bash
+   xattr -c /Applications/Agora.app
+   ```
+
+4. 双击打开。**完成** —— app 会自动建立本地 server 并开始采集你的 Agent 用量，打开即有数据。
+
+之后它常驻在**菜单栏**（关窗不退出）：左键图标可打开主界面、跳转用量看板/记忆中枢、或退出。数据全部在 `~/.agora/`（可用 `AGORA_HOME` 覆盖），零遥测。
+
+> **开箱即采集**：app 启动即自动建立 server 并后台采集各 Agent 的历史用量，无需任何手动配置。
+> **自动接入**：同时自动检测本地已装 Agent（Claude Code / Codex / OpenCode / Gemini CLI / Cursor / Hermes / Pi）并完成接入。
+
+### 开发者 / 服务器场景（CLI 可选）
 
 ```bash
-npm install -g agora-hub
-
-agora            # 启动中枢 → http://127.0.0.1:7878
-agora doctor     # 环境自检（探测本机 Agent 与数据）
-agora collect    # 立即采集一次各 Agent 的 token 用量
-agora mcp        # stdio MCP server（由 Agent 配置调用，通常无需手动跑）
+npm install -g agora-hub    # 要求 Node.js ≥ 22
+agora                       # 启动 → http://127.0.0.1:7878
+agora doctor                # 环境自检
 ```
-
-要求 **Node.js ≥ 22**。数据全部存放在 `~/.agora/`（可用 `AGORA_HOME` 覆盖）。
 
 从源码开发：
 
@@ -91,13 +104,7 @@ pnpm --filter @agora/server dev    # → 打开 http://127.0.0.1:7878
 
 前端热更新开发模式：`AGORA_DEV_ORIGIN=http://localhost:5173 pnpm dev`（Vite dev server 代理 API）。
 
-打包分发包：
-
-```bash
-pnpm run pack                      # bundle → agora-hub-<version>.tgz
-npm install -g ./agora-hub-0.1.1.tgz
-agora                              # → http://127.0.0.1:7878
-```
+打包分发包：`pnpm run pack`（bundle → tgz）；macOS app：`node scripts/prepare-sidecar.mjs && cd apps/desktop/src-tauri && cargo tauri build`（详见 [docs/distribution.md](docs/distribution.md)）。
 
 ## 🔌 Agent 接入（默认全自动）
 

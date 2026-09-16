@@ -50,28 +50,18 @@ cd /tmp/agora-clean && npm install --prefix . /path/to/agora-hub-0.1.0.tgz
 2. 推送到自己的 tap（`brew tap <you>/agora`）
 3. 用户 `brew install <you>/agora/agora-hub`
 
-## Tauri macOS 桌面版（已实现）
+## Tauri macOS 预研结论
 
-`apps/desktop/` 是 Tauri v2 壳，把 Node 运行时与后端 bundle 作为 sidecar 打进 `Agora.app`，webview 指向动态空闲端口上的本地 server。前后端零重写。
+**结论：暂缓集成，先跑通 npm 分发；macOS native 时走 sidecar 方案。**
 
-**构建**：
+| 方案 | 做法 | 评估 |
+|---|---|---|
+| A. sidecar + localhost（推荐起步） | Tauri shell 启动时 spawn `agora` bin，webview 加载 http://127.0.0.1:7878 | 前后端零改动；依赖系统 Node（或用 pkg/SEA 消除）；预估 1-2 天工作量 |
+| B. SEA 单可执行 | `node --experimental-sea` 把 cli.mjs 打成单二进制，Tauri 打包之 | 摆脱 Node 依赖的最终形态；`--experimental-sea` 对 better-sqlite3 原生 .node 需外置验证，experimental 风险 |
+| C. Rust 重写 | cc-switch 的路径 | 工作量大，放弃 TS 生态复用，不考虑 |
 
-```bash
-node scripts/prepare-sidecar.mjs    # 刷新 bundle 并组装 sidecar（node runtime + dist + better-sqlite3）
-cd apps/desktop/src-tauri
-cargo tauri build                   # 产出 Agora.app 与 Agora_<version>_aarch64.dmg
-```
-
-**已知坑（必须知道）**：
-
-1. **`strip` 会破坏 proc-macro dylib**：release 默认 `strip=debuginfo` 在本工具链组合下产出 `mis-aligned LINKEDIT string pool` 的损坏 dylib，dyld 拒绝加载，rustc 报 `can't find crate`（zerofrom_derive/phf_macros/serde_derive 全中招）。`Cargo.toml [profile.release] strip = "none"` 已固化修复，**不要打开 lto/strip**。
-2. **Finder 的 minimal PATH**：`whichBin` 会补扫常见 bin 目录（homebrew、~/.local/bin、~/.hermes/node/bin 等），桌面壳子进程也会注入扩充 PATH——改动 agent 探测逻辑时不要退回纯 PATH 依赖。
-3. **tauri dmg bundler 与新版 hdiutil 的兼容问题**：`bundle_dmg.sh` 直跑报参数错误，用 `bash bundle_dmg.sh --volname "Agora" "Agora_<v>_aarch64.dmg" "../macos/Agora.app"` 手动打包。
-
-**运行时行为**：启动时回收旧 sidecar PID（`~/.agora/app-sidecar.pid`）→ 选空闲端口 spawn sidecar → 等待 health → webview navigate 到 `http://127.0.0.1:<port>` → 退出时优雅 kill。单实例由 `tauri-plugin-single-instance` 保证。sidecar 日志在 `~/.agora/app-sidecar.log`。
-
-**分发**：GitHub release 附 `.dmg`（免签名，用户首次右键→打开；要双击即用需 Apple Developer ID 签名+公证）。
-
-## 历史：Tauri 预研结论（已按方案 A 落地）
-
-方案 A（sidecar + localhost）已采用并验证通过；方案 B（SEA）因 Node 22 SEA 仅支持 CJS 且我们的 bundle 为 ESM 含顶层 await 而放弃；方案 C（Rust 重写）不考虑。
+方案 A 的已知问题清单（集成时再处理）：
+- Tauri 进程退出时回收 spawn 的 Node 子进程（生命周期绑定）
+- 端口冲突检测（7878 被占时递增探测）
+- 菜单栏常驻 + 开机启动（Tauri 插件都有现成方案）
+- 前端无需改动（webview 直接加载 localhost 页面）

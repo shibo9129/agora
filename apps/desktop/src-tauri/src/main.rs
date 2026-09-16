@@ -9,9 +9,13 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use tauri::Manager;
+use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{Manager, RunEvent, WindowEvent};
 
 static SIDECAR: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static SIDECAR_PORT: OnceLock<u16> = OnceLock::new();
 
 fn home_dir() -> PathBuf {
     std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/"))
@@ -24,6 +28,52 @@ fn agora_home() -> PathBuf {
 fn pid_file() -> PathBuf {
     agora_home().join("app-sidecar.pid")
 }
+
+fn sidecar_port() -> u16 {
+    SIDECAR_PORT.get().copied().unwrap_or(7878)
+}
+
+fn show_window(app: &tauri::AppHandle, path: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let url = format!("http://127.0.0.1:{}{}", sidecar_port(), path);
+        if let Ok(parsed) = url.parse() {
+            let _ = window.navigate(parsed);
+        }
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn build_tray(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
+    let open = MenuItem::with_id(app, "open", "打开 Agora", true, None::<&str>)?;
+    let usage = MenuItem::with_id(app, "usage", "用量看板", true, None::<&str>)?;
+    let memory = MenuItem::with_id(app, "memory", "记忆中枢", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &usage, &memory, &quit])?;
+
+    let icon_bytes: &[u8] = include_bytes!("../icons/32x32.png");
+    let icon = Image::from_bytes(icon_bytes).expect("tray icon");
+
+    TrayIconBuilder::new()
+        .icon(icon)
+        .tooltip("Agora — 本地 AI 中枢")
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "open" => show_window(app, "/"),
+            "usage" => show_window(app, "/#/usage"),
+            "memory" => show_window(app, "/#/memory"),
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .build(app)?;
+    Ok(())
+}
+
+fn home_dir_unused() {}
 
 fn pick_free_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
@@ -76,9 +126,14 @@ fn main() {
             // Second launch: focus the existing window instead of spawning
             // a new sidecar (the plugin terminates this new process for us).
         }))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
             reclaim_stale_sidecar();
             let port = pick_free_port();
+            let _ = SIDECAR_PORT.set(port);
 
             // sidecar binary is packed next to the app exe via externalBin
             let exe_dir = std::env::current_exe()
@@ -129,12 +184,27 @@ fn main() {
                     .navigate(target.parse().expect("url parse"))
                     .expect("navigate");
             }
+
+            build_tray(app.handle())?;
+
+            // Closing the window hides it — the hub keeps running in the
+            // menu bar. Real exit happens via the tray 退出 item.
+            if let Some(window) = app.get_webview_window("main") {
+                let window_for_event = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_for_event.hide();
+                    }
+                });
+            }
+
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error building agora desktop")
-        .run(|_app, event| {
-            if let tauri::RunEvent::ExitRequested { .. } = event {
+        .run(|_app, event| match event {
+            RunEvent::ExitRequested { .. } => {
                 if let Some(lock) = SIDECAR.get() {
                     if let Ok(mut guard) = lock.lock() {
                         if let Some(mut child) = guard.take() {
@@ -144,5 +214,6 @@ fn main() {
                 }
                 let _ = fs::remove_file(pid_file());
             }
+            _ => {}
         });
 }
