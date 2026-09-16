@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agora</title>
+  <style>
+    body {
+      margin: 0; height: 100vh; display: grid; place-items: center;
+      background: #06070c; color: #9c9ca8;
+      font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", sans-serif;
+    }
+    .box { text-align: center; }
+    .pulse {
+      width: 14px; height: 14px; margin: 0 auto 14px; border-radius: 50%;
+      background: #10b981; animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+    .title { font-size: 14px; letter-spacing: .04em; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="pulse"></div>
+    <div class="title">Agora 正在启动…</div>
+  </div>
+</body>
+</html>

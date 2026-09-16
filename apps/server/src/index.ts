@@ -21,6 +21,7 @@ import {
   queryByProject,
   queryCollectorStatus,
   queryDaily,
+  queryHourly,
   querySummary,
   runCollection,
   type CollectionReport,
@@ -85,6 +86,7 @@ app.get('/api/usage/by-agent', (c) => c.json({ rows: queryByAgent(db, daysParam(
 app.get('/api/usage/by-model', (c) => c.json({ rows: queryByModel(db, daysParam(c)) }));
 app.get('/api/usage/by-project', (c) => c.json({ rows: queryByProject(db, daysParam(c)) }));
 app.get('/api/usage/daily', (c) => c.json({ rows: queryDaily(db, daysParam(c) ?? 30) }));
+app.get('/api/usage/hourly', (c) => c.json({ rows: queryHourly(db) }));
 
 // ── Knowledge bases ───────────────────────────────────────────────────────
 app.route('/api/kb', kbRoutes(db));

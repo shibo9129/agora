@@ -9,6 +9,7 @@ import {
   type AgentDetection,
   type CollectionReport,
   type DailyUsage,
+  type HourlyUsage,
   type ModelBreakdown,
   type ProjectBreakdown,
   type UsageTotals,
@@ -212,6 +213,7 @@ function UsageDashboard() {
   const [byModel, setByModel] = useState<ModelBreakdown[]>([]);
   const [byProject, setByProject] = useState<ProjectBreakdown[]>([]);
   const [daily, setDaily] = useState<DailyUsage[]>([]);
+  const [hourly, setHourly] = useState<HourlyUsage[]>([]);
   const [agents, setAgents] = useState<AgentDetection[]>([]);
   const [collecting, setCollecting] = useState(false);
   const [lastReport, setLastReport] = useState<CollectionReport | null>(null);
@@ -220,13 +222,15 @@ function UsageDashboard() {
   const load = useCallback(async () => {
     try {
       const d = days === 0 ? undefined : days;
-      const [s, a, m, p, dy, ag] = await Promise.all([
+      const [s, a, m, p, dy, ag, hy] = await Promise.all([
         api.summary(d),
         api.byAgent(d),
         api.byModel(d),
         api.byProject(d),
         api.daily(days === 0 ? 3650 : days),
         api.agents(),
+        // Intraday series only needed on the 今天 view; still cheap to fetch.
+        days === 1 ? api.hourly() : Promise.resolve({ rows: [] }),
       ]);
       setSummary(s);
       setByAgent(a.rows);
@@ -234,6 +238,7 @@ function UsageDashboard() {
       setByProject(p.rows);
       setDaily(dy.rows);
       setAgents(ag.agents);
+      setHourly(hy.rows);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -296,14 +301,29 @@ function UsageDashboard() {
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
   }, [daily, formatMoney, settings.currency]);
 
-  const dailyOption = useMemo(() => {
-    const daysList = [...new Set(daily.map((d) => d.day))].sort();
-    const agentsList = [...new Set(daily.map((d) => d.agent))];
+  const trendOption = useMemo(() => {
+    // 今天: intraday hour scale; other ranges: per-day scale.
+    const hourlyView = days === 1;
+    let categories: string[];
+    let seriesFor: (agent: string) => number[];
+    if (hourlyView) {
+      const nowHour = new Date().getHours();
+      const hours = Array.from({ length: nowHour + 1 }, (_, i) => String(i).padStart(2, '0'));
+      categories = hours.map((h) => `${h}:00`);
+      seriesFor = (agent) =>
+        hours.map((h) => hourly.find((r) => r.hour === h && r.agent === agent)?.totalTokens ?? 0);
+    } else {
+      const daysList = [...new Set(daily.map((d) => d.day))].sort();
+      categories = daysList;
+      seriesFor = (agent) =>
+        daysList.map((day) => daily.find((d) => d.day === day && d.agent === agent)?.totalTokens ?? 0);
+    }
+    const agentsList = [...new Set((hourlyView ? hourly : daily).map((d) => d.agent))];
     return {
       backgroundColor: 'transparent',
       tooltip: {
         trigger: 'axis',
-        valueFormatter: (v: number) => formatMoney(v),
+        valueFormatter: (v: number) => formatTokens(v),
         ...chartTooltipBase(getChartTheme()),
         axisPointer: {
           type: 'line',
@@ -314,7 +334,7 @@ function UsageDashboard() {
       grid: { left: 56, right: 16, top: 16, bottom: 58 },
       xAxis: {
         type: 'category' as const,
-        data: daysList,
+        data: categories,
         boundaryGap: false,
         axisLabel: { color: getChartTheme().axis, fontSize: 11 },
         axisLine: { lineStyle: { color: getChartTheme().grid } },
@@ -322,38 +342,26 @@ function UsageDashboard() {
       },
       yAxis: {
         type: 'value' as const,
-        axisLabel: { color: getChartTheme().axis, fontSize: 11, formatter: (v: number) => `${CURRENCY_SYMBOLS[settings.currency]}${v}` },
+        axisLabel: { color: getChartTheme().axis, fontSize: 11, formatter: (v: number) => formatTokens(v) },
         splitLine: { lineStyle: { color: getChartTheme().grid } },
       },
+      // Independent lines (never stacked): each agent's line must sit at its own
+      // value — stacking made small agents float at the top of the pile.
       series: agentsList.map((agent) => {
         const color = agentColor(agent);
         return {
           name: agentLabel(agent),
           type: 'line' as const,
-          stack: 'cost',
           smooth: 0.35,
           symbol: 'none',
           lineStyle: { width: 2, color },
           itemStyle: { color },
-          areaStyle: {
-            color: {
-              type: 'linear' as const,
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: `${color}55` },
-                { offset: 1, color: `${color}05` },
-              ],
-            },
-          },
           emphasis: { focus: 'series' as const },
-          data: daysList.map((day) => {
-            const row = daily.find((d) => d.day === day && d.agent === agent);
-            return row ? Number(row.costUSD.toFixed(4)) : 0;
-          }),
+          data: seriesFor(agent),
         };
       }),
     };
-  }, [daily, formatMoney, settings.currency, themeTick]);
+  }, [daily, hourly, days, themeTick]);
 
   return (
     <div>
@@ -430,8 +438,8 @@ function UsageDashboard() {
           <Chart option={pieOption} className="h-72 w-full" />
         </SpotlightZone>
         <SpotlightZone className="card p-5">
-          <h2 className="section-title mb-3">每日成本趋势</h2>
-          <Chart option={dailyOption} className="h-72 w-full" />
+          <h2 className="section-title mb-3">{days === 1 ? '今日 Token 用量趋势（按小时）' : '每日 Token 用量趋势'}</h2>
+          <Chart option={trendOption} className="h-72 w-full" />
         </SpotlightZone>
       </section>
 

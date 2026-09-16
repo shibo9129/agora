@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
-import { insertRecords, queryDaily, querySummary } from '../store.js';
+import { insertRecords, queryDaily, queryHourly, querySummary } from '../store.js';
 import type { UsageRecord } from '../types.js';
 
 function recordAt(ts: string, tokens: number, agent = 'codex'): UsageRecord {
@@ -71,6 +71,31 @@ describe('calendar-day query semantics', () => {
     const week = querySummary(db, 7);
     expect(week.calls).toBe(2);
     expect(week.inputTokens).toBe(500);
+    db.close();
+  });
+
+  it('queryHourly buckets today by local hour and ignores yesterday', () => {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE usage_records (
+      dedupe_key TEXT PRIMARY KEY, agent TEXT NOT NULL, session_id TEXT NOT NULL,
+      project TEXT, model TEXT NOT NULL, ts TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+      reasoning_tokens INTEGER NOT NULL DEFAULT 0, web_search_requests INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0, estimated INTEGER NOT NULL DEFAULT 0,
+      source_path TEXT NOT NULL, collected_at TEXT NOT NULL DEFAULT '')`);
+    insertRecords(db, [
+      recordAt(localIso(0, 8, 15), 100),   // today 08:15 → hour 08
+      recordAt(localIso(0, 8, 45), 200),   // today 08:45 → hour 08
+      recordAt(localIso(0, 13, 5), 300),   // today 13:05 → hour 13
+      recordAt(localIso(1, 23, 50), 400),  // yesterday → excluded
+    ], ':memory:');
+    const rows = queryHourly(db);
+    const h08 = rows.find((r) => r.hour === '08');
+    const h13 = rows.find((r) => r.hour === '13');
+    expect(h08?.inputTokens).toBe(300);
+    expect(h13?.inputTokens).toBe(300);
+    expect(rows.some((r) => r.hour === '23')).toBe(false);
     db.close();
   });
 

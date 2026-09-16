@@ -75,16 +75,37 @@ function makeAdapter(def: {
   return adapter;
 }
 
-/** Find a CLI binary on PATH (posix `which` semantics, no shell). */
+/** Find a CLI binary on PATH (posix `which` semantics, no shell), then fall
+ *  back to well-known install locations — desktop apps launched from Finder
+ *  get a minimal PATH that misses most CLI tools. */
 export async function whichBin(name: string, env?: AdapterEnv): Promise<string | null> {
+  const home = env?.home ?? homedir();
   const pathEnv = (env?.env ?? process.env)['PATH'] ?? '';
+  const candidates: string[] = [];
   for (const dir of pathEnv.split(':')) {
-    if (!dir) continue;
-    const candidate = join(dir, name);
+    if (dir) candidates.push(join(dir, name));
+  }
+  for (const dir of WELL_KNOWN_BIN_DIRS) {
+    candidates.push(join(dir.replace(/^~/, home), name));
+  }
+  for (const candidate of candidates) {
     if (await exists(candidate)) return candidate;
   }
   return null;
 }
+
+const WELL_KNOWN_BIN_DIRS = [
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  '/usr/bin',
+  '~/bin',
+  '~/.local/bin',
+  '~/.hermes/node/bin',
+  '~/.npm-global/bin',
+  '~/.bun/bin',
+  '~/.volta/bin',
+  '~/.nvm/current/bin',
+];
 
 export const claudeCodeAdapter = makeAdapter({
   id: 'claude-code',

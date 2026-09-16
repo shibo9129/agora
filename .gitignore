@@ -5,3 +5,5 @@ dist/
 coverage/
 .agora-data/
 *.tgz
+target/
+apps/desktop/src-tauri/sidecar/

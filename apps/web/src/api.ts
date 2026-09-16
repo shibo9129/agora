@@ -26,6 +26,12 @@ export interface DailyUsage extends UsageTotals {
   agent: string;
 }
 
+export interface HourlyUsage extends UsageTotals {
+  /** Local hour of today, zero-padded '00'..'23'. */
+  hour: string;
+  agent: string;
+}
+
 export interface AgentDetection {
   id: string;
   displayName: string;
@@ -71,6 +77,7 @@ export const api = {
   byModel: (days?: number) => get<{ rows: ModelBreakdown[] }>(`/api/usage/by-model${days ? `?days=${days}` : ''}`),
   byProject: (days?: number) => get<{ rows: ProjectBreakdown[] }>(`/api/usage/by-project${days ? `?days=${days}` : ''}`),
   daily: (days = 30) => get<{ rows: DailyUsage[] }>(`/api/usage/daily?days=${days}`),
+  hourly: () => get<{ rows: HourlyUsage[] }>('/api/usage/hourly'),
   agents: () => get<{ agents: AgentDetection[] }>('/api/agents'),
   collect: async (): Promise<CollectionReport> => {
     const res = await fetch('/api/collect', { method: 'POST', headers: { 'X-Agora-Request': '1' } });

@@ -227,6 +227,25 @@ export function queryDaily(db: Database.Database, days = 30): DailyUsage[] {
     .all(params) as DailyUsage[];
 }
 
+export interface HourlyUsage extends UsageTotals {
+  /** Local hour of today, zero-padded '00'..'23'. */
+  hour: string;
+  agent: string;
+}
+
+/** Intraday breakdown for "today" (since local midnight), bucketed by local hour. */
+export function queryHourly(db: Database.Database): HourlyUsage[] {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  return db
+    .prepare(
+      `SELECT strftime('%H', ts, 'localtime') AS hour, agent, ${TOTALS_SQL}
+         FROM usage_records WHERE ts >= @since
+        GROUP BY hour, agent ORDER BY hour ASC`,
+    )
+    .all({ since: cutoff.toISOString() }) as HourlyUsage[];
+}
+
 export interface ProjectBreakdown extends UsageTotals {
   project: string;
 }
