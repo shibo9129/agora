@@ -24,7 +24,7 @@ function Swatch({ color, active, onClick }: { color: string; active: boolean; on
   );
 }
 
-export function SettingsPanel() {
+export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' | 'top' }) {
   const { settings, update, liveRates } = useSettings();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,6 +50,8 @@ export function SettingsPanel() {
           ? '缓存'
           : '兜底';
 
+  const panelPos = placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2';
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -65,7 +67,7 @@ export function SettingsPanel() {
       </button>
 
       {open && (
-        <div className="card-pop dialog-panel absolute right-0 top-11 z-50 w-72 p-4">
+        <div className={`card-pop dialog-panel absolute right-0 ${panelPos} z-50 w-72 p-4`}>
           <div className="section-title mb-3">外观</div>
           <div className="mb-3 flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
             {(

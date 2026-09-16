@@ -44,7 +44,6 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 | 🧠 **记忆中枢** | 一键同步各 Agent 的记忆到中央仓库（**Markdown 为唯一事实源**，SQLite 只是可删索引）；自动同步模式会写入同步规则到各 Agent 入口文件并定时汇聚 |
 | ⚡ **开箱即采集** | 装完打开即有数据——app 启动自动建立 server 并后台采集各 Agent 历史用量，无需任何手动配置 |
 | 🔌 **自动接入** | 把 Agora MCP server 注册进 Agent 配置 + 在入口文件注入使用指引（受管区块，全程可逆，写前自动 `.bak` 备份） |
-| 🔄 **应用内更新** | app 内自动/手动检查更新（tauri updater + minisign 验签），一键下载安装重启 |
 | 🎨 **主题系统** | 跟随系统自动切换深浅色，深色 × 3 / 浅色 × 3 套皮肤，任意皮肤都可深链接分享 |
 
 ## 📸 界面一览
@@ -189,7 +188,6 @@ pnpm -r run typecheck
 - [x] M5 联网更新（Git 安装 + 更新检查 + 官方 registry 市场）
 - [x] M6 打包分发（npm bin + esbuild 单 bundle + brew 模板）
 - [x] 主题系统（自动/手动 × 6 皮肤）、实时汇率、一键记忆同步
-- [x] macOS 侧边栏 UI、应用内更新（检查/下载/安装/重启）
 - [x] Pi 适配器与用量采集器、**自动接入**（启动时自动检测并接入本地 Agent）
 - [ ] brew tap 发布、Tauri macOS 壳（sidecar 方案已定）
 - [ ] 更多采集器（Gemini CLI / Cursor / Aider）、registry 自建索引

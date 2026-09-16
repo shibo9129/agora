@@ -73,7 +73,7 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
       </nav>
 
       <div className="sidebar-footer">
-        <SettingsPanel />
+        <SettingsPanel placement="top" />
         <span className="sidebar-version">v0.1.2</span>
       </div>
     </aside>
