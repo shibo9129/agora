@@ -93,6 +93,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [liveRates, setLiveRates] = useState<RatesInfo | null>(null);
 
+  // Deep-link a skin for shareable URLs / screenshots: ?theme=light:paper
+  const urlTheme = useMemo(() => {
+    const m = new URLSearchParams(window.location.search).get('theme');
+    return m && /^(dark|light):[a-z]+$/.test(m) ? (m as `${'dark' | 'light'}:${string}`) : null;
+  }, []);
+
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
@@ -128,10 +134,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // Apply theme to <html data-theme="dark:aurora" style="color-scheme: dark">
   useEffect(() => {
-    const skin = resolvedTheme === 'dark' ? settings.darkSkin : settings.lightSkin;
-    document.documentElement.dataset['theme'] = `${resolvedTheme}:${skin}`;
-    document.documentElement.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme, settings.darkSkin, settings.lightSkin]);
+    const skin = urlTheme
+      ? urlTheme.split(':')[1]
+      : resolvedTheme === 'dark'
+        ? settings.darkSkin
+        : settings.lightSkin;
+    const mode = urlTheme ? urlTheme.split(':')[0] : resolvedTheme;
+    document.documentElement.dataset['theme'] = `${mode}:${skin}`;
+    document.documentElement.style.colorScheme = mode!;
+  }, [resolvedTheme, settings.darkSkin, settings.lightSkin, urlTheme]);
 
   const formatMoney = useCallback(
     (usd: number): string => {

@@ -106,8 +106,44 @@ function StatCard({
 }
 
 export default function App() {
-  const [page, setPage] = useState<'usage' | 'kb' | 'tools' | 'memory'>('usage');
+  const [page, setPage] = useState<'usage' | 'kb' | 'tools' | 'memory'>(() => {
+    const h = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+    return h === 'kb' || h === 'tools' || h === 'memory' ? h : 'usage';
+  });
   const [openKb, setOpenKb] = useState<KnowledgeBase | null>(null);
+
+  // Deep-link: #/kb/<id> opens a kb detail directly.
+  useEffect(() => {
+    const h = window.location.hash.replace(/^#\/?/, '');
+    if (h.startsWith('kb/')) {
+      const id = h.slice(3);
+      void import('./kb/api').then(({ kbApi }) =>
+        kbApi.list().then(({ kbs }) => {
+          const found = kbs.find((k) => k.id === id);
+          if (found) {
+            setPage('kb');
+            setOpenKb(found);
+          }
+        }),
+      );
+    }
+  }, []);
+
+  const goto = useCallback((p: 'usage' | 'kb' | 'tools' | 'memory') => {
+    setPage(p);
+    setOpenKb(null);
+    window.location.hash = p === 'usage' ? '/' : `/${p}`;
+  }, []);
+
+  const openKbDetail = useCallback((kb: KnowledgeBase) => {
+    setOpenKb(kb);
+    window.location.hash = `/kb/${kb.id}`;
+  }, []);
+
+  const backToKbList = useCallback(() => {
+    setOpenKb(null);
+    window.location.hash = '/kb';
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -132,10 +168,7 @@ export default function App() {
               ).map(([p, label]) => (
                 <button
                   key={p}
-                  onClick={() => {
-                    setPage(p);
-                    setOpenKb(null);
-                  }}
+                  onClick={() => goto(p)}
                   className={page === p ? 'nav-tab nav-tab-active' : 'nav-tab'}
                 >
                   {label}
@@ -154,8 +187,8 @@ export default function App() {
 
       <main key={`${page}${openKb?.id ?? ''}`} className="page-enter mx-auto max-w-6xl px-6 py-8">
         {page === 'usage' && <UsageDashboard />}
-        {page === 'kb' && !openKb && <KbPage onOpenKb={setOpenKb} />}
-        {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={() => setOpenKb(null)} />}
+        {page === 'kb' && !openKb && <KbPage onOpenKb={openKbDetail} />}
+        {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={backToKbList} />}
         {page === 'tools' && <ToolsPage />}
         {page === 'memory' && <MemoryPage />}
       </main>
