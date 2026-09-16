@@ -36,6 +36,7 @@
     "@agora/usage": "workspace:*",
     "@hono/node-server": "^1.14.0",
     "better-sqlite3": "^12.2.0",
+    "chokidar": "^5.0.0",
     "hono": "^4.8.0"
   },
   "publishConfig": {

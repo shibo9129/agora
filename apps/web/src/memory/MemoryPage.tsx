@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { memoryApi, type HubAgentStatus, type MemoryConfig, type MemoryDocument, type MemoryEntry, type MemoryGroup } from './api';
+import { useHubEvents } from '../hooks/useHubEvents';
 
 function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
   const [agents, setAgents] = useState<HubAgentStatus[]>([]);
@@ -142,6 +143,12 @@ export function MemoryPage() {
     void load();
     void loadConfig();
   }, [load, loadConfig]);
+
+  // Live reload when a sync lands new memories or enrollment changes.
+  useHubEvents({
+    onUsageUpdated: () => void load(),
+    onAgentsUpdated: () => void load(),
+  });
 
   useEffect(() => {
     if (query.trim().length === 0) {

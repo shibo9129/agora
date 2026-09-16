@@ -21,6 +21,7 @@ import type { KnowledgeBase } from './kb/api';
 import { ToolsPage } from './tools/ToolsPage';
 import { MemoryPage } from './memory/MemoryPage';
 import { useCountUp } from './hooks/useCountUp';
+import { useHubEvents } from './hooks/useHubEvents';
 import { SpotlightZone } from './components/SpotlightZone';
 import { AgoraLogo } from './components/AgoraLogo';
 import { SettingsPanel } from './settings/SettingsPanel';
@@ -248,6 +249,12 @@ function UsageDashboard() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Live: hub pushes usage-updated when new agent data lands (real-time watch).
+  useHubEvents({
+    onUsageUpdated: () => void load(),
+    onAgentsUpdated: () => void load(),
+  });
 
   const onCollect = async () => {
     setCollecting(true);

@@ -7,6 +7,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { streamSSE } from 'hono/streaming';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -32,6 +33,7 @@ import { kbRoutes } from './kb.js';
 import { memoryRoutes, hubRoutes } from './memory.js';
 import { ratesRoutes } from './rates.js';
 import { toolRoutes } from './tools.js';
+import { emitHubEvent, hubEvents, startRealtimeWatch, type HubEvent } from './watch.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env['AGORA_PORT'] ?? 7878);
@@ -70,6 +72,74 @@ app.post('/api/collect', async (c) => {
   const report = await collecting;
   return c.json(report);
 });
+
+// Auto-collect on start: the app should have data the moment the user first
+// opens it (desktop is the primary distribution — no manual setup step).
+// Disable with AGORA_NO_AUTOCOLLECT=1. Runs in the background, never blocks.
+const startCollection = (): Promise<CollectionReport> => {
+  if (!collecting) {
+    collecting = runCollection(db, {}).finally(() => {
+      collecting = null;
+    });
+  }
+  return collecting;
+};
+
+if (process.env['AGORA_NO_AUTOCOLLECT'] !== '1') {
+  setImmediate(() => {
+    void startCollection().then((report) => {
+      console.log(
+        `[agora] 启动自动采集完成：新增 ${report.totals.inserted} 条（解析 ${report.totals.parsed}，重复 ${report.totals.duplicates}）`,
+      );
+      emitHubEvent('usage-updated', { inserted: report.totals.inserted, parsed: report.totals.parsed });
+    }).catch((err) => console.error('[agora] 启动自动采集失败:', err));
+  });
+}
+
+// ── Real-time pipeline: watch agent data dirs → incremental collect → SSE ──
+startRealtimeWatch({ collect: () => startCollection() });
+
+// ── SSE: every open UI subscribes here and updates live ───────────────────
+app.get('/api/events', (c) => {
+  return streamSSE(c, async (stream) => {
+    await stream.writeSSE({ event: 'hello', data: '{"ok":true}' });
+    const listener = (event: HubEvent) => {
+      void stream
+        .writeSSE({ event: event.type, data: JSON.stringify(event) })
+        .catch(() => {
+          hubEvents.off('hub-event', listener);
+        });
+    };
+    hubEvents.on('hub-event', listener);
+    const keepalive = setInterval(() => {
+      void stream.writeSSE({ event: 'ping', data: '{}' }).catch(() => {
+        clearInterval(keepalive);
+        hubEvents.off('hub-event', listener);
+      });
+    }, 25_000);
+    stream.onAbort(() => {
+      clearInterval(keepalive);
+      hubEvents.off('hub-event', listener);
+    });
+    await new Promise(() => {});
+  });
+});
+
+// ── Agent re-detection: newly installed agents get auto-enrolled + broadcast ──
+const AGENT_RECHECK_INTERVAL_MS = 5 * 60 * 1000;
+let knownAgentIds = new Set<string>((await detectAgents()).filter((a) => a.installed).map((a) => a.id));
+setInterval(async () => {
+  try {
+    const now = (await detectAgents()).filter((a) => a.installed).map((a) => a.id);
+    const added = now.filter((id) => !knownAgentIds.has(id));
+    if (added.length > 0) {
+      knownAgentIds = new Set(now);
+      emitHubEvent('agents-updated', { added });
+    }
+  } catch {
+    // detection failure — skip this round quietly
+  }
+}, AGENT_RECHECK_INTERVAL_MS).unref();
 
 app.get('/api/collectors/status', (c) => c.json({ sources: queryCollectorStatus(db) }));
 
@@ -116,3 +186,17 @@ if (webDist) {
 serve({ fetch: app.fetch, hostname: host, port }, (info) => {
   console.log(`agora server listening on http://${host}:${info.port}`);
 });
+
+// Orphan watchdog: when launched as a desktop-app sidecar, exit promptly if
+// our parent process dies (prevents leaked sidecars from crashed apps).
+if (process.env['AGORA_NO_ORPHAN_WATCHDOG'] !== '1') {
+  const parentPid = process.ppid;
+  setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch {
+      console.log('[agora] 父进程已退出，sidecar 自动退出');
+      process.exit(0);
+    }
+  }, 5000).unref();
+}

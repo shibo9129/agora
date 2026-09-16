@@ -10,6 +10,7 @@ import {
   type UpdateStatus,
 } from './api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useHubEvents } from '../hooks/useHubEvents';
 
 const AGENT_LABELS: Record<string, string> = {
   'claude-code': 'Claude Code',
@@ -631,6 +632,11 @@ export function ToolsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Live reload when agents are (un)enrolled or health data changes.
+  useHubEvents({
+    onAgentsUpdated: () => void load(),
+  });
 
   // Only agents actually installed on this machine get columns / action slots.
   // Linkable = installed AND the adapter declares skill dirs (drives the matrix).
