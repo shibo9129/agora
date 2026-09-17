@@ -80,7 +80,7 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 之后它常驻在**菜单栏**（关窗不退出）：左键图标可打开主界面、跳转用量看板/记忆中枢、或退出。数据全部在 `~/.agora/`（可用 `AGORA_HOME` 覆盖），零遥测。
 
 > **开箱即采集**：app 启动即自动建立 server 并后台采集各 Agent 的历史用量，无需任何手动配置。
-> **自动接入**：同时自动检测本地已装 Agent（Claude Code / Codex / OpenCode / Gemini CLI / Cursor / Hermes / Pi）并完成接入。
+> **自动接入**：同时自动检测本地已装 Agent（Claude Code / Codex / OpenCode / Gemini CLI / Grok / Qwen Code / Kimi Code / Amp / Crush / Aider / Amazon Q / Droid / iFlow CLI / Cursor / Windsurf / Zed / Hermes / Pi）并完成接入。
 
 ### 开发者 / 服务器场景（CLI 可选）
 
@@ -113,6 +113,12 @@ pnpm --filter @agora/server dev    # → 打开 http://127.0.0.1:7878
 | Codex | TOML | ✅ | `[mcp_servers.*]` 段落行级手术，保护手维护的注释与格式 |
 | OpenCode | JSONC | ✅ | `jsonc-parser` 注释保留写入 |
 | Gemini CLI | JSON | ✅ | 保格式局部编辑 |
+| Grok | TOML | ✅ | `[mcp_servers.*]` 格式与 Codex 一致 |
+| Qwen Code | JSON | ✅ | `settings.json` 的 `mcpServers` |
+| Kimi Code / Kimi CLI | JSON | ✅ | `mcp.json` 标准 `mcpServers` |
+| Amazon Q | JSON | ✅ | legacy `~/.aws/amazonq/mcp.json` |
+| Droid | JSON | ✅ | `~/.factory/mcp.json` 标准 `mcpServers` |
+| Windsurf | JSON | ✅ | `~/.codeium/windsurf/mcp_config.json` |
 | Cursor | JSON | ✅ | 保格式局部编辑 |
 | Hermes | YAML | ✅ | `mcp_servers:` 块级手术，嵌套结构完整保留 |
 | Pi | JSON | ✅ | 保格式局部编辑（Pi 的 MCP 由用户自行安装 extension 消费） |

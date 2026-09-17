@@ -101,6 +101,8 @@ const WELL_KNOWN_BIN_DIRS = [
   '~/bin',
   '~/.local/bin',
   '~/.hermes/node/bin',
+  '~/.grok/bin',
+  '~/.kimi-code/bin',
   '~/.npm-global/bin',
   '~/.bun/bin',
   '~/.volta/bin',
@@ -226,6 +228,175 @@ export const piAdapter = makeAdapter({
   mcpWritable: true,
 });
 
+/** Grok CLI (xAI). Config ~/.grok (config.toml, TOML); MCP uses the same
+ *  `[mcp_servers.*]` TOML layout as Codex, so the TOML writer can manage it.
+ *  Entry files: it scans Agents.md / Claude.md / AGENT.md / AGENTS.md. */
+export const grokAdapter = makeAdapter({
+  id: 'grok',
+  displayName: 'Grok',
+  category: 'cli',
+  entryFiles: ['AGENTS.md', 'Claude.md', 'AGENT.md', 'Agents.md'],
+  configHome: (e) => join(home(e), '.grok'),
+  presenceProof: async (e) =>
+    (await exists(join(home(e), '.grok', 'bin', 'grok'))) || (await whichBin('grok', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'config.toml'))) ? 'config.toml found' : undefined),
+  skillDirs: (e) => [join(home(e), '.grok', 'skills')],
+  mcpConfig: (e) => ({ path: join(home(e), '.grok', 'config.toml'), format: 'toml' }),
+  mcpWritable: true,
+});
+
+/** Qwen Code (Gemini CLI fork). Config ~/.qwen/settings.json; entry QWEN.md. */
+export const qwenCodeAdapter = makeAdapter({
+  id: 'qwen-code',
+  displayName: 'Qwen Code',
+  category: 'cli',
+  entryFiles: ['QWEN.md'],
+  configHome: (e) => join(home(e), '.qwen'),
+  presenceProof: async (e) => (await whichBin('qwen', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'settings.json'))) ? 'settings.json found' : undefined),
+  skillDirs: (e) => [join(home(e), '.qwen', 'skills')],
+  mcpConfig: (e) => ({ path: join(home(e), '.qwen', 'settings.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** Kimi Code (Moonshot; successor of Kimi CLI). Home ~/.kimi-code with its own
+ *  bundled bin/kimi, config.toml (TOML) and mcp.json (standard mcpServers). */
+export const kimiCodeAdapter = makeAdapter({
+  id: 'kimi-code',
+  displayName: 'Kimi Code',
+  category: 'cli',
+  entryFiles: ['AGENTS.md'],
+  configHome: (e) => join(home(e), '.kimi-code'),
+  presenceProof: async (e) =>
+    (await exists(join(home(e), '.kimi-code', 'bin', 'kimi'))) || (await whichBin('kimi', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'config.toml'))) ? 'config.toml found' : undefined),
+  skillDirs: (e) => [join(home(e), '.kimi-code', 'skills')],
+  mcpConfig: (e) => ({ path: join(home(e), '.kimi-code', 'mcp.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** Legacy Kimi CLI (MoonshotAI/kimi-cli, being sunset in favor of Kimi Code). */
+export const kimiCliAdapter = makeAdapter({
+  id: 'kimi-cli',
+  displayName: 'Kimi CLI',
+  category: 'cli',
+  entryFiles: ['AGENTS.md'],
+  configHome: (e) => join(home(e), '.kimi'),
+  presenceProof: async (e) => (await whichBin('kimi', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'config.toml'))) ? 'config.toml found' : undefined),
+  skillDirs: (e) => [join(home(e), '.kimi', 'skills')],
+  mcpConfig: (e) => ({ path: join(home(e), '.kimi', 'mcp.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** Amp (Sourcegraph). Config ~/.config/amp/settings.json; MCP lives under the
+ *  nested `amp.mcpServers` key — exposed for reading, not written by Agora. */
+export const ampAdapter = makeAdapter({
+  id: 'amp',
+  displayName: 'Amp',
+  category: 'cli',
+  entryFiles: ['AGENTS.md'],
+  configHome: (e) => join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'amp'),
+  presenceProof: async (e) => (await whichBin('amp', e)) !== null,
+  detectDetail: async (dir) =>
+    (await exists(join(dir, 'settings.json'))) || (await exists(join(dir, 'settings.jsonc')))
+      ? 'settings.json found'
+      : undefined,
+  skillDirs: (e) => [join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'amp', 'skills')],
+});
+
+/** Crush (Charm). XDG config ~/.config/crush; main config is a bash `crushrc`
+ *  (legacy crush.json deprecated), so Agora does not write its MCP config. */
+export const crushAdapter = makeAdapter({
+  id: 'crush',
+  displayName: 'Crush',
+  category: 'cli',
+  entryFiles: ['AGENTS.md', 'CRUSH.md'],
+  configHome: (e) => join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'crush'),
+  presenceProof: async (e) => (await whichBin('crush', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'crushrc'))) ? 'crushrc found' : undefined),
+  skillDirs: (e) => [join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'crush', 'skills')],
+});
+
+/** Aider. No config home — its config is a single YAML file ~/.aider.conf.yml
+ *  (stat works on files too). No MCP, no skills; CONVENTIONS.md is manual. */
+export const aiderAdapter = makeAdapter({
+  id: 'aider',
+  displayName: 'Aider',
+  category: 'cli',
+  entryFiles: ['CONVENTIONS.md'],
+  configHome: (e) => join(home(e), '.aider.conf.yml'),
+  presenceProof: async (e) => (await whichBin('aider', e)) !== null,
+});
+
+/** Amazon Q Developer CLI (unmaintained upstream; successor is Kiro CLI).
+ *  MCP: legacy ~/.aws/amazonq/mcp.json with standard mcpServers. */
+export const amazonQAdapter = makeAdapter({
+  id: 'amazon-q',
+  displayName: 'Amazon Q',
+  category: 'cli',
+  entryFiles: ['AmazonQ.md'],
+  configHome: (e) => join(home(e), '.aws', 'amazonq'),
+  presenceProof: async (e) =>
+    (await exists('/Applications/Amazon Q.app')) || (await whichBin('q', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'mcp.json'))) ? 'mcp.json found' : undefined),
+  mcpConfig: (e) => ({ path: join(home(e), '.aws', 'amazonq', 'mcp.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** Factory Droid. Config ~/.factory/settings.json; MCP ~/.factory/mcp.json. */
+export const droidAdapter = makeAdapter({
+  id: 'droid',
+  displayName: 'Droid',
+  category: 'cli',
+  entryFiles: ['AGENTS.md'],
+  configHome: (e) => join(home(e), '.factory'),
+  presenceProof: async (e) => (await whichBin('droid', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'settings.json'))) ? 'settings.json found' : undefined),
+  skillDirs: (e) => [join(home(e), '.factory', 'skills')],
+  mcpConfig: (e) => ({ path: join(home(e), '.factory', 'mcp.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** iFlow CLI (Gemini CLI fork; announced EOL 2026-04). Config ~/.iflow. */
+export const iflowAdapter = makeAdapter({
+  id: 'iflow-cli',
+  displayName: 'iFlow CLI',
+  category: 'cli',
+  entryFiles: ['IFLOW.md'],
+  configHome: (e) => join(home(e), '.iflow'),
+  presenceProof: async (e) => (await whichBin('iflow', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'settings.json'))) ? 'settings.json found' : undefined),
+  mcpConfig: (e) => ({ path: join(home(e), '.iflow', 'settings.json'), format: 'json' }),
+});
+
+/** Windsurf (desktop IDE). Config ~/.codeium/windsurf (mcp_config.json). */
+export const windsurfAdapter = makeAdapter({
+  id: 'windsurf',
+  displayName: 'Windsurf',
+  category: 'desktop',
+  entryFiles: ['AGENTS.md', '.windsurf/rules'],
+  configHome: (e) => join(home(e), '.codeium', 'windsurf'),
+  presenceProof: async (e) =>
+    (await exists('/Applications/Windsurf.app')) || (await whichBin('windsurf', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'mcp_config.json'))) ? 'mcp_config.json found' : undefined),
+  mcpConfig: (e) => ({ path: join(home(e), '.codeium', 'windsurf', 'mcp_config.json'), format: 'json' }),
+  mcpWritable: true,
+});
+
+/** Zed (editor with agent panel). Config ~/.config/zed; MCP uses the
+ *  `context_servers` key in settings.json — read-only ref, not written. */
+export const zedAdapter = makeAdapter({
+  id: 'zed',
+  displayName: 'Zed',
+  category: 'desktop',
+  entryFiles: ['AGENTS.md'],
+  configHome: (e) => join(environ(e)['XDG_CONFIG_HOME'] ?? join(home(e), '.config'), 'zed'),
+  presenceProof: async (e) =>
+    (await exists('/Applications/Zed.app')) || (await whichBin('zed', e)) !== null,
+  detectDetail: async (dir) => ((await exists(join(dir, 'settings.json'))) ? 'settings.json found' : undefined),
+});
+
 /** The cross-agent shared skill pool (ECC convention: ~/.agents/skills). */
 export const sharedPoolAdapter = makeAdapter({
   id: 'shared-pool',
@@ -256,7 +427,19 @@ export const builtinAdapters: AgentAdapter[] = [
   codexAdapter,
   opencodeAdapter,
   geminiCliAdapter,
+  grokAdapter,
+  qwenCodeAdapter,
+  kimiCodeAdapter,
+  kimiCliAdapter,
+  ampAdapter,
+  crushAdapter,
+  aiderAdapter,
+  amazonQAdapter,
+  droidAdapter,
+  iflowAdapter,
   cursorAdapter,
+  windsurfAdapter,
+  zedAdapter,
   hermesAdapter,
   // pi precedes the shared pool: they scan the same dir, and location dedup
   // keeps the first report so pool skills are attributed to the real agent.
