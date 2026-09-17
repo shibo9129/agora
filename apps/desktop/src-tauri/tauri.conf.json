@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Agora",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "dev.agora.hub",
   "build": {
     "frontendDist": "../frontend"
@@ -21,20 +21,35 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
-    "externalBin": ["sidecar/node-runtime"],
-    "resources": ["sidecar/dist", "sidecar/node_modules"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "externalBin": [
+      "sidecar/node-runtime"
+    ],
+    "resources": [
+      "sidecar/dist",
+      "sidecar/node_modules"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0",
       "entitlements": "entitlements/app.plist"
     },
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
     "createUpdaterArtifacts": true
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNFOThBOTI5NThCOUUyQzgKUldUSTRybFlLYW1ZUHEzRTZ2WjRWREF5U3B0Rk5JZEo3REZVc3NjcXY5R2kydjhEckE4UjJtYXcK",
-      "endpoints": ["https://github.com/stanshek/agora/releases/latest/download/update.json"],
+      "endpoints": [
+        "https://github.com/stanshek/agora/releases/latest/download/update.json"
+      ],
       "windows": {
         "installMode": "passive"
       }
