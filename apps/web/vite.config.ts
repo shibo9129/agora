@@ -8,7 +8,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:7878',
+        // Override to point the dev UI at a non-default server instance.
+        target: process.env['AGORA_API_ORIGIN'] ?? 'http://127.0.0.1:7878',
         changeOrigin: true,
       },
     },

@@ -23,9 +23,12 @@ const db = openDb();
 migrateKnowledge(db);
 const memory = new MemoryStore(db, defaultMemoryRoot());
 
+// Injected at bundle time (scripts/bundle.mjs define) — never hardcode a version here.
+declare const __AGORA_VERSION__: string | undefined;
+
 const server = new McpServer({
   name: 'agora-hub',
-  version: '0.1.1',
+  version: typeof __AGORA_VERSION__ !== 'undefined' ? __AGORA_VERSION__ : '0.0.0-dev',
 });
 
 function text(content: string): { content: { type: 'text'; text: string }[] } {

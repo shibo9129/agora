@@ -37,10 +37,13 @@ cd /tmp/agora-clean && npm install --prefix . /path/to/agora-hub-0.1.0.tgz
 
 发布 checklist：
 1. `pnpm -r run test` 全绿（usage/knowledge/tools/memory/hub）
-2. `pnpm --filter @agora/web build` 刷新前端产物
-3. `node scripts/pack.mjs` 生成 tarball
-4. 干净目录安装验证（doctor/start/collect/mcp initialize）
-5. 版本号 bump（apps/server/package.json）
+2. `node scripts/ui-smoke.mjs` UI 冒烟全绿（弹窗位置/版本号/图表口径）
+3. `pnpm --filter @agora/web build` 刷新前端产物
+4. `node scripts/pack.mjs` 生成 tarball
+5. 干净目录安装验证（doctor/start/collect/mcp initialize）
+6. 版本号 bump（apps/server/package.json）
+
+macOS 桌面版（dmg + 应用内更新）发布见 `docs/release-desktop.md`（Developer ID 签名 + 公证 + `scripts/release-desktop.sh`）。
 
 ## Homebrew
 

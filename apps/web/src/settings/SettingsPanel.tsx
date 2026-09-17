@@ -50,7 +50,10 @@ export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' |
           ? '缓存'
           : '兜底';
 
-  const panelPos = placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2';
+  // bottom-left anchor (sidebar footer) opens upward and grows rightward so
+  // the panel never spills past the window's left edge; top-right anchor
+  // (header) opens downward and grows leftward.
+  const panelPos = placement === 'top' ? 'bottom-full left-0 mb-2' : 'top-full right-0 mt-2';
 
   return (
     <div ref={ref} className="relative">
@@ -67,7 +70,7 @@ export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' |
       </button>
 
       {open && (
-        <div className={`card-pop dialog-panel absolute right-0 ${panelPos} z-50 w-72 p-4`}>
+        <div className={`card-pop dialog-panel absolute ${panelPos} z-50 w-72 p-4`}>
           <div className="section-title mb-3">外观</div>
           <div className="mb-3 flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
             {(

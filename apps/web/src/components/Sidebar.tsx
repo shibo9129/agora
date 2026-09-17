@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { AgoraLogo } from './AgoraLogo';
 import { SettingsPanel } from '../settings/SettingsPanel';
 
@@ -48,6 +49,21 @@ const NAV_ITEMS: { id: PageId; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: PageId) => void }) {
+  // Version comes from the running server (single source of truth), never hardcoded.
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d?.version) setVersion(d.version as string);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -74,7 +90,7 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
 
       <div className="sidebar-footer">
         <SettingsPanel placement="top" />
-        <span className="sidebar-version">v0.1.2</span>
+        {version && <span className="sidebar-version">v{version}</span>}
       </div>
     </aside>
   );

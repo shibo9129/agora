@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
 const outDir = join(repoRoot, 'apps/server/dist');
+const serverVersion = JSON.parse(readFileSync(join(repoRoot, 'apps/server/package.json'), 'utf8')).version;
 
 execFileSync('pnpm', ['--filter', '@agora/web', 'build'], { cwd: repoRoot, stdio: 'inherit' });
 
@@ -26,6 +27,7 @@ const shared = {
   target: 'node22',
   sourcemap: true,
   external: ['better-sqlite3'],
+  define: { __AGORA_VERSION__: JSON.stringify(serverVersion) },
   logLevel: 'info',
   // CJS deps (gray-matter etc.) call require() at runtime; ESM bundles don't
   // have one, so inject createRequire (esbuild-recommended shim).

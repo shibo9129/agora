@@ -585,6 +585,10 @@ body::before {
   background: color-mix(in srgb, var(--color-panel) 60%, transparent);
   border-right: 1px solid var(--color-edge);
   backdrop-filter: blur(24px) saturate(1.4);
+  /* backdrop-filter creates a stacking context; without an explicit z-index
+     the sidebar paints below .app-main, which clipped the settings popover. */
+  position: relative;
+  z-index: 20;
 }
 
 .sidebar-brand {

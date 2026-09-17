@@ -36,6 +36,7 @@ for (const pkg of ['better-sqlite3', 'bindings', 'file-uri-to-path']) {
   const dst = join(sidecarDir, 'node_modules', pkg);
   mkdirSync(join(sidecarDir, 'node_modules'), { recursive: true });
   cpSync(src, dst, { recursive: true });
+  rmSync(join(dst, 'build/Release/test_extension.node'), { force: true }); // 自测产物，不打进包里
 }
 
 if (!existsSync(nodeRuntime)) throw new Error('node runtime staging failed');

@@ -232,7 +232,7 @@ function UsageDashboard() {
       const ct = getChartTheme();
       return {
         backgroundColor: 'transparent',
-        tooltip: { trigger: 'item', valueFormatter: (v: number) => formatMoney(v), ...chartTooltipBase(ct) },
+        tooltip: { trigger: 'item', valueFormatter: (v: number) => formatTokens(v), ...chartTooltipBase(ct) },
         legend: { bottom: 0, textStyle: { color: ct.legend, fontSize: 11 }, itemWidth: 12, itemHeight: 8, icon: 'roundRect' },
         series: [
           {
@@ -242,14 +242,14 @@ function UsageDashboard() {
             label: { color: ct.legend, fontSize: 11, formatter: '{b}\n{d}%' },
             data: byAgent.map((a) => ({
               name: agentLabel(a.agent),
-              value: Number(a.costUSD.toFixed(4)),
+              value: a.totalTokens,
               itemStyle: { color: agentColor(a.agent) },
             })),
           },
         ],
       };
     },
-    [byAgent, formatMoney, themeTick],
+    [byAgent, themeTick],
   );
 
   const dailyTotalCost = useMemo(() => {
@@ -397,7 +397,7 @@ function UsageDashboard() {
 
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <SpotlightZone className="card p-5">
-          <h2 className="section-title mb-3">成本占比（按 Agent）</h2>
+          <h2 className="section-title mb-3">Token 占比（按 Agent）</h2>
           <Chart option={pieOption} className="h-72 w-full" />
         </SpotlightZone>
         <SpotlightZone className="card p-5">

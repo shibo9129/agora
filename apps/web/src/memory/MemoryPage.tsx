@@ -44,7 +44,7 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-3">
+      <div className="card flex items-center justify-between p-4">
         <div>
           <div className="text-sm font-medium">自动接入本地 Agent</div>
           <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-dim)]">

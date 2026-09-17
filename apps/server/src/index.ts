@@ -9,7 +9,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,7 +51,20 @@ const app = new Hono();
 app.use('*', localBoundary(port, devOrigin));
 if (devOrigin) app.use('/api/*', cors({ origin: devOrigin, allowHeaders: ['Content-Type', 'X-Agora-Request'] }));
 
-app.get('/api/health', (c) => c.json({ ok: true, name: 'agora', version: '0.1.1' }));
+// Version is injected at bundle time (scripts/bundle.mjs); in dev (tsx) fall
+// back to the workspace package.json sitting next to this file.
+declare const __AGORA_VERSION__: string | undefined;
+const SERVER_VERSION: string = (() => {
+  if (typeof __AGORA_VERSION__ !== 'undefined') return __AGORA_VERSION__;
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0-dev';
+  } catch {
+    return '0.0.0-dev';
+  }
+})();
+
+app.get('/api/health', (c) => c.json({ ok: true, name: 'agora', version: SERVER_VERSION }));
 
 // ── Agents ────────────────────────────────────────────────────────────────
 app.get('/api/agents', async (c) => {

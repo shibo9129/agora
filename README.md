@@ -72,13 +72,10 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 
 1. 下载 **[最新 release](https://github.com/stanshek/agora/releases)** 里的 `Agora_<版本>_aarch64.dmg`
 2. 打开 dmg，把 **Agora.app** 拖进 `/Applications`
-3. 在终端执行一次（清除下载隔离属性，只需一次）：
+3. 双击打开。**完成** —— app 会自动建立本地 server 并开始采集你的 Agent 用量，打开即有数据。
 
-   ```bash
-   xattr -c /Applications/Agora.app
-   ```
-
-4. 双击打开。**完成** —— app 会自动建立本地 server 并开始采集你的 Agent 用量，打开即有数据。
+> **≤0.1.3 旧版提示「已损坏 / damaged」？** 那些版本未做 Apple 公证，在终端执行一次
+> `xattr -c /Applications/Agora.app` 即可打开。0.1.4 起 dmg 已完成 Developer ID 签名 + 公证，无需此步骤。
 
 之后它常驻在**菜单栏**（关窗不退出）：左键图标可打开主界面、跳转用量看板/记忆中枢、或退出。数据全部在 `~/.agora/`（可用 `AGORA_HOME` 覆盖），零遥测。
 
