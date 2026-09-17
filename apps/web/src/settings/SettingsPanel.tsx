@@ -38,6 +38,13 @@ export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' |
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  // Cmd+, (App.tsx global shortcut) toggles settings — the macOS convention.
+  useEffect(() => {
+    const onToggle = () => setOpen((v) => !v);
+    window.addEventListener('agora:toggle-settings', onToggle);
+    return () => window.removeEventListener('agora:toggle-settings', onToggle);
+  }, []);
+
   const manualRate = settings.rates[settings.currency];
   const liveRate = settings.currency === 'USD' ? 1 : liveRates?.rates[settings.currency];
   const effectiveRate = manualRate ?? liveRate ?? STATIC_FALLBACK_RATES[settings.currency];

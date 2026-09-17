@@ -66,7 +66,8 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
+      <div className="sidebar-drag" data-tauri-drag-region />
+      <div className="sidebar-brand" data-tauri-drag-region>
         <AgoraLogo size={30} />
         <div className="sidebar-brand-text">
           <div className="sidebar-brand-name">Agora</div>

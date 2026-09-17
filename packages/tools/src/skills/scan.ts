@@ -131,12 +131,15 @@ export async function scanUnifiedSkills(
     // agents (pi, OpenCode). Locations are kept per-agent on purpose; health
     // checks dedupe by path when counting copies.
     // Source of truth preference: Agora store (hub-installed) > shared pool >
-    // any other real location > whatever exists.
+    // any other real location. Never a 'link' — linking a new agent to
+    // another agent's own symlink (e.g. a codex plugin's ~/.codex/skills/X,
+    // itself pointing into codex's private, version-churning plugin cache)
+    // builds a link chain that snaps the moment the upstream agent reorganizes
+    // its own links. Only a real (non-symlink) copy is a stable target.
     skill.realLocation =
       skill.locations.find((l) => l.kind === 'real' && l.agent === 'agora-store') ??
       skill.locations.find((l) => l.kind === 'real' && l.agent === 'shared-pool') ??
-      skill.locations.find((l) => l.kind === 'real') ??
-      skill.locations[0];
+      skill.locations.find((l) => l.kind === 'real');
     skill.locations.sort((a, b) => a.agent.localeCompare(b.agent));
   }
 

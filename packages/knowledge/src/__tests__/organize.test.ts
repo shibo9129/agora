@@ -80,6 +80,27 @@ describe('organize', () => {
   });
 });
 
+it('lists a below-threshold category in skipped instead of silently dropping it', async () => {
+  // 2 docs + 2 images (organizable) + 1 lone zip (its own category, but below
+  // MIN_CATEGORY_SIZE) — the zip must show up in `skipped`, not vanish
+  // without explanation the way `noCategory` files never did.
+  const d = mkdtempSync(join(tmpdir(), 'agora-kb-org2-'));
+  writeFileSync(join(d, 'a.txt'), 'a');
+  writeFileSync(join(d, 'b.pdf'), 'b');
+  writeFileSync(join(d, 'c.png'), 'c');
+  writeFileSync(join(d, 'd.jpg'), 'd');
+  writeFileSync(join(d, 'e.zip'), 'e');
+  const db2 = new Database(':memory:');
+  migrateKnowledge(db2);
+  const kb2 = createKb(db2, 'org2', d);
+  await scanKb(db2, kb2.id, d);
+  const plan = proposeOrganization(db2, kb2.id, '');
+  expect(plan.moves.some((m) => m.from === 'e.zip')).toBe(false);
+  expect(plan.skipped.some((s) => s.path === 'e.zip')).toBe(true);
+  db2.close();
+  rmSync(d, { recursive: true, force: true });
+});
+
 it('protects wiki entrypoints and rejects symlink ancestors', async () => {
   const { symlinkSync, mkdirSync } = await import('node:fs');
   writeFileSync(join(dir, 'AGENTS.md'), 'keep');

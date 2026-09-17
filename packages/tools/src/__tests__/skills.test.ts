@@ -100,6 +100,28 @@ describe('skill toggle', () => {
   it('refuses to remove a real install (data protection)', async () => {
     await expect(setSkillEnabled('gamma', 'claude-code', false, env, builtinAdapters)).rejects.toThrow('实体安装');
   });
+
+  it('refuses to link a new agent off another agent\'s own (healthy) link — no stable target to chain onto', async () => {
+    // epsilon exists for real only outside any adapter's skillDirs; codex's
+    // own skills dir merely links to it (mirrors how e.g. a codex plugin
+    // manager exposes its cache under ~/.codex/skills as a symlink). Without
+    // a genuine 'real' location, enabling epsilon elsewhere must fail rather
+    // than link onto codex's link — that link is codex's to move/remove, and
+    // a link-onto-link snaps the moment codex reorganizes it.
+    makeSkill(join(root, 'external-cache/epsilon'), 'epsilon', 'Epsilon skill');
+    mkdirSync(join(root, '.codex/skills'), { recursive: true });
+    symlinkSync(join(root, 'external-cache/epsilon'), join(root, '.codex/skills/epsilon'), 'dir');
+    try {
+      const skills = await scanUnifiedSkills(env, builtinAdapters);
+      const epsilon = skills.find((s) => s.name === 'epsilon')!;
+      expect(epsilon.locations.every((l) => l.kind === 'link')).toBe(true);
+      expect(epsilon.realLocation).toBeUndefined();
+      await expect(setSkillEnabled('epsilon', 'claude-code', true, env, builtinAdapters)).rejects.toThrow('没有实体位置可链接');
+    } finally {
+      rmSync(join(root, '.codex/skills/epsilon'), { force: true });
+      rmSync(join(root, 'external-cache'), { recursive: true, force: true });
+    }
+  });
 });
 
 describe('broken link repair', () => {

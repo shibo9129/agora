@@ -54,6 +54,11 @@ beforeAll(() => {
   writeFileSync(join(root, '.config/opencode/opencode.jsonc'), OPENCODE_JSONC);
   mkdirSync(join(root, '.codex'), { recursive: true });
   writeFileSync(join(root, '.codex/config.toml'), CODEX_TOML);
+  // Droid config dir with no `droid` binary anywhere on PATH/well-known dirs
+  // (unlike codex/claude/etc., unlikely to be genuinely installed on the
+  // machine running this test) — a deterministic 'residual' fixture for the
+  // declared-missing health check below.
+  mkdirSync(join(root, '.factory'), { recursive: true });
 });
 
 afterAll(() => {
@@ -186,7 +191,12 @@ describe('health checks', () => {
     expect(drift).toBeDefined();
     expect(drift!.severity).toBe('error');
     const missing = issues.filter((i) => i.kind === 'declared-missing');
-    expect(missing.length).toBeGreaterThan(0); // gemini/cursor/hermes not in fixture
+    // Droid: config dir present but no binary found — residual, a real issue.
+    expect(missing.some((i) => i.message.includes('Droid'))).toBe(true);
+    // Gemini/cursor/hermes: no config dir at all — never installed, expected
+    // state, not a health issue (agents a user never touched shouldn't count
+    // as "problems").
+    expect(missing.some((i) => i.message.includes('Gemini') || i.message.includes('Cursor') || i.message.includes('Hermes'))).toBe(false);
   });
 });
 

@@ -15,7 +15,10 @@
         "height": 840,
         "minWidth": 960,
         "minHeight": 640,
-        "url": "loading.html"
+        "url": "loading.html",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 16 }
       }
     ]
   },

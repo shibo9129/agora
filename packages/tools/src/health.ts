@@ -17,15 +17,17 @@ export async function runHealthChecks(
 ): Promise<HealthIssue[]> {
   const issues: HealthIssue[] = [];
 
-  // 1. Declared config homes that don't exist on disk.
+  // 1. Agents that used to be set up but no longer are (config dir remains,
+  // app binary gone) — a real regression. An adapter that was simply never
+  // installed ('absent') is normal, expected state, not a health issue.
   for (const adapter of adapters) {
     try {
       const detection = await adapter.detect(env);
-      if (!detection.installed && adapter.id !== 'shared-pool') {
+      if (detection.presence === 'residual') {
         issues.push({
           kind: 'declared-missing',
           severity: 'warn',
-          message: `${adapter.displayName} 的配置目录不存在`,
+          message: `${adapter.displayName} 配置残留，但应用本体未找到（已卸载或未安装）`,
           detail: detection.configHome,
         });
       }

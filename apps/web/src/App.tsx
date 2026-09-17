@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AGENT_COLORS,
   AGENT_LABELS,
@@ -15,11 +15,7 @@ import {
   type UsageTotals,
 } from './api';
 import { Chart } from './components/Chart';
-import { KbPage } from './kb/KbPage';
-import { KbDetail } from './kb/KbDetail';
 import type { KnowledgeBase } from './kb/api';
-import { ToolsPage } from './tools/ToolsPage';
-import { MemoryPage } from './memory/MemoryPage';
 import { useCountUp } from './hooks/useCountUp';
 import { useHubEvents } from './hooks/useHubEvents';
 import { SpotlightZone } from './components/SpotlightZone';
@@ -28,6 +24,25 @@ import { Sidebar, type PageId } from './components/Sidebar';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { useSettings, CURRENCY_SYMBOLS } from './settings/settings';
 import { getChartTheme, chartTooltipBase, useThemeTick } from './components/chart-theme';
+
+// Code-split every page but the default landing one — keeps first paint to
+// just the usage dashboard + echarts instead of the whole app up front.
+const KbPage = lazy(() => import('./kb/KbPage').then((m) => ({ default: m.KbPage })));
+const KbDetail = lazy(() => import('./kb/KbDetail').then((m) => ({ default: m.KbDetail })));
+const ToolsPage = lazy(() => import('./tools/ToolsPage').then((m) => ({ default: m.ToolsPage })));
+const MemoryPage = lazy(() => import('./memory/MemoryPage').then((m) => ({ default: m.MemoryPage })));
+
+const PAGE_SHORTCUTS: Record<string, PageId> = { '1': 'usage', '2': 'kb', '3': 'tools', '4': 'memory' };
+
+function PageSkeleton() {
+  return (
+    <div className="stagger grid grid-cols-2 gap-4 md:grid-cols-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="skeleton h-32" />
+      ))}
+    </div>
+  );
+}
 
 export default function App() {
   const [page, setPage] = useState<PageId>(() => {
@@ -69,15 +84,39 @@ export default function App() {
     window.location.hash = '/kb';
   }, []);
 
+  // macOS-native chrome: Cmd+1..4 switches sections, Cmd+, opens settings —
+  // without these a Tauri window just feels like a webpage, not an app.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.metaKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (e.key === ',') {
+        e.preventDefault();
+        window.dispatchEvent(new Event('agora:toggle-settings'));
+        return;
+      }
+      const targetPage = PAGE_SHORTCUTS[e.key];
+      if (targetPage) {
+        e.preventDefault();
+        goto(targetPage);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [goto]);
+
   return (
     <div className="app-shell">
       <Sidebar page={page} onNavigate={goto} />
       <main key={`${page}${openKb?.id ?? ''}`} className="page-enter app-main">
-        {page === 'usage' && <UsageDashboard />}
-        {page === 'kb' && !openKb && <KbPage onOpenKb={openKbDetail} />}
-        {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={backToKbList} />}
-        {page === 'tools' && <ToolsPage />}
-        {page === 'memory' && <MemoryPage />}
+        <Suspense fallback={<PageSkeleton />}>
+          {page === 'usage' && <UsageDashboard />}
+          {page === 'kb' && !openKb && <KbPage onOpenKb={openKbDetail} />}
+          {page === 'kb' && openKb && <KbDetail kb={openKb} onBack={backToKbList} />}
+          {page === 'tools' && <ToolsPage />}
+          {page === 'memory' && <MemoryPage />}
+        </Suspense>
       </main>
     </div>
   );

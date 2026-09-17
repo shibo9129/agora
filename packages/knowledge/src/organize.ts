@@ -73,7 +73,10 @@ export function proposeOrganization(db: Database.Database, kbId: string, subdir 
   }
 
   for (const [cat, list] of byCategory) {
-    if (list.length < MIN_CATEGORY_SIZE) continue;
+    if (list.length < MIN_CATEGORY_SIZE) {
+      for (const f of list) plan.skipped.push({ path: f.path, reason: `${cat}/ 仅 ${list.length} 个文件，未达到归类阈值` });
+      continue;
+    }
     for (const f of list) {
       plan.moves.push({
         from: f.path,
