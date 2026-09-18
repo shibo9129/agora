@@ -1,7 +1,8 @@
 /**
  * Live fiat rates: frankfurter.app (ECB reference rates, free, no key) with
- * a 6h memory+disk cache and a static offline fallback. Rates are for display
- * conversion only — costs are always stored in USD.
+ * a 12h memory+disk cache and a static offline fallback. Rates are for display
+ * conversion only — costs are always stored in USD. The UI does not accept
+ * manual overrides; this module refreshes in the background.
  */
 import { Hono } from 'hono';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -9,7 +10,8 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
 const PROVIDER_URL = 'https://api.frankfurter.app/latest?from=USD&to=CNY,EUR,HKD';
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+export const RATES_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const CACHE_TTL_MS = RATES_CACHE_TTL_MS;
 
 const FALLBACK_RATES = { CNY: 7.2, EUR: 0.92, HKD: 7.8 };
 
@@ -74,6 +76,14 @@ export async function getRates(): Promise<RatesSnapshot> {
     })();
   }
   return inFlight;
+}
+
+export function startRatesRefresh(intervalMs = CACHE_TTL_MS): void {
+  void getRates().catch(() => null);
+  setInterval(() => {
+    memoryCache = null;
+    void getRates().catch(() => null);
+  }, intervalMs).unref();
 }
 
 export function ratesRoutes(): Hono {

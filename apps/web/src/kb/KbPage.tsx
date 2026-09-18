@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LoadGate, Skeleton, usePageLoad } from '../components/LoadState';
+import { DirectoryPicker } from '../components/DirectoryPicker';
+import { LoadGate, usePageLoad } from '../components/LoadState';
 import { formatBytes, kbApi, type KnowledgeBase, type KbTemplate } from './api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -68,12 +69,12 @@ function CreateDialog({
         </label>
 
         <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-[var(--color-ink-dim)]">{mode === 'create' ? '创建到目录' : '已有目录路径'}</span>
-          <input
+          <span className="mb-1 block text-[var(--color-ink-dim)]">{mode === 'create' ? '创建到目录' : '已有目录'}</span>
+          <DirectoryPicker
             value={rootPath}
-            onChange={(e) => setRootPath(e.target.value)}
-            placeholder={mode === 'create' ? '/Users/you/wiki/my-kb' : '/Users/you/notes'}
-            className="w-full input-field font-mono text-xs"
+            onChange={setRootPath}
+            title={mode === 'create' ? '选择知识库创建目录' : '选择已有知识库目录'}
+            placeholder={mode === 'create' ? '选择要创建到的文件夹' : '选择已有文件夹'}
           />
         </label>
 

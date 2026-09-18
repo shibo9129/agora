@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useEffect, useState } from 'react';
 import { AgoraLogo } from './AgoraLogo';
+import { onWindowDragMouseDown } from '../desktop';
 import { SettingsPanel } from '../settings/SettingsPanel';
 
 export type PageId = 'usage' | 'kb' | 'tools' | 'memory';
@@ -66,8 +67,8 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-drag" data-tauri-drag-region />
-      <div className="sidebar-brand" data-tauri-drag-region>
+      <div className="sidebar-drag" data-tauri-drag-region onMouseDown={onWindowDragMouseDown} />
+      <div className="sidebar-brand" data-tauri-drag-region onMouseDown={onWindowDragMouseDown}>
         <AgoraLogo size={30} />
         <div className="sidebar-brand-text">
           <div className="sidebar-brand-name">Agora</div>

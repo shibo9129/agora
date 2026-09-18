@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-/** App-wide user settings (persisted to localStorage). */
+/** App-wide user settings. Canonical copy lives in ~/.agora/ui-settings.json. */
 
 export type ThemeMode = 'auto' | 'dark' | 'light';
 export type CurrencyCode = 'USD' | 'CNY' | 'EUR' | 'HKD';
@@ -10,8 +10,6 @@ export interface AppSettings {
   darkSkin: string;
   lightSkin: string;
   currency: CurrencyCode;
-  /** Fiat per 1 USD (manually editable; offline defaults). */
-  rates: Record<CurrencyCode, number>;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -19,9 +17,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   darkSkin: 'aurora',
   lightSkin: 'paper',
   currency: 'USD',
-  // Empty by default: only currencies the USER manually edited appear here.
-  // Resolution order: manual > live (server) > static fallback.
-  rates: {} as Record<CurrencyCode, number>,
 };
 
 export const STATIC_FALLBACK_RATES: Record<CurrencyCode, number> = {
@@ -38,7 +33,10 @@ export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   HKD: 'HK$',
 };
 
-/** Live rates from the hub server (frankfurter via /api/rates, cached 6h). */
+const CURRENCIES = new Set<CurrencyCode>(['USD', 'CNY', 'EUR', 'HKD']);
+const THEME_MODES = new Set<ThemeMode>(['auto', 'dark', 'light']);
+
+/** Live rates from the hub server (frankfurter via /api/rates, cached 12h). */
 export interface RatesInfo {
   rates: { CNY: number; EUR: number; HKD: number };
   fetchedAt: string;
@@ -57,22 +55,55 @@ export async function fetchLiveRates(): Promise<RatesInfo | null> {
 }
 
 const STORAGE_KEY = 'agora-settings';
+const RATES_REFRESH_MS = 12 * 60 * 60 * 1000;
 
-function loadSettings(): AppSettings {
+function parseSettings(raw: unknown): Partial<AppSettings> {
+  if (!raw || typeof raw !== 'object') return {};
+  const o = raw as Record<string, unknown>;
+  const out: Partial<AppSettings> = {};
+  if (typeof o['themeMode'] === 'string' && THEME_MODES.has(o['themeMode'] as ThemeMode)) {
+    out.themeMode = o['themeMode'] as ThemeMode;
+  }
+  if (typeof o['darkSkin'] === 'string' && o['darkSkin']) out.darkSkin = o['darkSkin'];
+  if (typeof o['lightSkin'] === 'string' && o['lightSkin']) out.lightSkin = o['lightSkin'];
+  if (typeof o['currency'] === 'string' && CURRENCIES.has(o['currency'] as CurrencyCode)) {
+    out.currency = o['currency'] as CurrencyCode;
+  }
+  return out;
+}
+
+function loadLocalSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppSettings>;
-      return {
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        rates: { ...(parsed.rates ?? {}) } as Record<CurrencyCode, number>,
-      };
-    }
+    if (raw) return { ...DEFAULT_SETTINGS, ...parseSettings(JSON.parse(raw)) };
   } catch {
     // corrupted storage → defaults
   }
-  return DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS };
+}
+
+async function fetchRemoteSettings(): Promise<{ settings: AppSettings; persisted: boolean } | null> {
+  try {
+    const res = await fetch('/api/settings');
+    if (!res.ok) return null;
+    const body = (await res.json()) as AppSettings & { persisted?: boolean };
+    return { settings: { ...DEFAULT_SETTINGS, ...parseSettings(body) }, persisted: body.persisted === true };
+  } catch {
+    return null;
+  }
+}
+
+async function persistRemoteSettings(settings: AppSettings): Promise<void> {
+  await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Agora-Request': '1' },
+    body: JSON.stringify({
+      themeMode: settings.themeMode,
+      darkSkin: settings.darkSkin,
+      lightSkin: settings.lightSkin,
+      currency: settings.currency,
+    }),
+  });
 }
 
 interface SettingsContextValue {
@@ -89,7 +120,7 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [settings, setSettings] = useState<AppSettings>(loadLocalSettings);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [liveRates, setLiveRates] = useState<RatesInfo | null>(null);
 
@@ -106,7 +137,38 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // Pull live rates once at startup (and refresh every 6h while running).
+  // Hydrate from ~/.agora/ui-settings.json (survives updates). If the server
+  // has never saved, migrate whatever localStorage still has.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const remote = await fetchRemoteSettings();
+      if (cancelled || !remote) return;
+      if (remote.persisted) {
+        setSettings(remote.settings);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.settings));
+        } catch {
+          // ignore quota
+        }
+        return;
+      }
+      const local = loadLocalSettings();
+      const hasLocal = JSON.stringify(local) !== JSON.stringify(DEFAULT_SETTINGS);
+      if (hasLocal) {
+        try {
+          await persistRemoteSettings(local);
+        } catch {
+          // keep using local until the next launch
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Pull live rates once at startup (and refresh every 12h while running).
   useEffect(() => {
     let mounted = true;
     const pull = async () => {
@@ -114,7 +176,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (mounted && info) setLiveRates(info);
     };
     void pull();
-    const timer = setInterval(pull, 6 * 60 * 60 * 1000);
+    const timer = setInterval(pull, RATES_REFRESH_MS);
     return () => {
       mounted = false;
       clearInterval(timer);
@@ -123,8 +185,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback((patch: Partial<AppSettings>) => {
     setSettings((prev) => {
-      const next = { ...prev, ...patch, rates: { ...prev.rates, ...(patch.rates ?? {}) } };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore quota
+      }
+      void persistRemoteSettings(next).catch(() => null);
       return next;
     });
   }, []);
@@ -146,10 +213,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const formatMoney = useCallback(
     (usd: number): string => {
-      // Manual override wins; live rates beat static defaults.
-      const manual = settings.rates[settings.currency];
       const live = settings.currency === 'USD' ? 1 : liveRates?.rates[settings.currency];
-      const rate = manual ?? live ?? STATIC_FALLBACK_RATES[settings.currency];
+      const rate = live ?? STATIC_FALLBACK_RATES[settings.currency];
       const symbol = CURRENCY_SYMBOLS[settings.currency];
       const converted = usd * rate;
       if (converted >= 1000) return `${symbol}${converted.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
@@ -157,7 +222,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (converted >= 1) return `${symbol}${converted.toFixed(2)}`;
       return `${symbol}${converted.toFixed(4)}`;
     },
-    [settings.currency, settings.rates, liveRates],
+    [settings.currency, liveRates],
   );
 
   const value = useMemo(

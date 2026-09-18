@@ -49,7 +49,7 @@ export const DEFAULT_SYNC_INTERVAL_MINUTES = 10;
 /** Live memory-root accessor shared with hubRoutes (set by memoryRoutes). */
 let activeMemoryRoot: () => string = () => defaultMemoryRoot();
 
-function writeHubConfig(config: HubConfig): void {
+export function writeHubConfig(config: HubConfig): void {
   mkdirSync(dirname(configPath()), { recursive: true });
   writeFileSync(configPath(), JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
@@ -83,12 +83,16 @@ export function memoryRoutes(db: Database.Database): Hono {
 
   const applyAutoSync = async (enabled: boolean) => {
     stopAutoSync();
-    const agents = (await hubStatus()).map((a) => a.agent);
-    for (const agentId of agents) {
-      await setMemorySyncRule(agentId, store.root, enabled).catch(() => null);
+    try {
+      const agents = (await hubStatus()).map((a) => a.agent);
+      for (const agentId of agents) {
+        await setMemorySyncRule(agentId, store.root, enabled).catch(() => null);
+      }
+    } catch {
+      // Rule injection is best-effort; the saved switch must still take effect.
     }
     if (enabled) {
-      void runSync();
+      void runSync().catch(() => null);
       const intervalMs = (config.syncIntervalMinutes ?? DEFAULT_SYNC_INTERVAL_MINUTES) * 60 * 1000;
       timer = setInterval(() => void runSync().catch(() => null), intervalMs);
       timer.unref();

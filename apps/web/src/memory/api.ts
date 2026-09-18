@@ -54,13 +54,19 @@ export interface SyncReport {
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { ...init?.headers, 'X-Agora-Request': '1' } });
-  const body = (await res.json()) as T & { error?: string };
+  const text = await res.text();
+  let body: T & { error?: string };
+  try {
+    body = JSON.parse(text) as T & { error?: string };
+  } catch {
+    throw new Error(res.ok ? `${path}: 无效响应` : `${path}: ${res.status}`);
+  }
   if (!res.ok) throw new Error(body.error ?? `${path}: ${res.status}`);
   return body;
 }
 
-const json = (body: unknown): RequestInit => ({
-  method: 'POST',
+const json = (body: unknown, method: RequestInit['method'] = 'POST'): RequestInit => ({
+  method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
@@ -82,6 +88,9 @@ export const memoryApi = {
   unenroll: (agent: string) => req<unknown>('/api/hub/unenroll', json({ agent })),
   config: () => req<MemoryConfig>('/api/memory/config'),
   saveConfig: (input: { rootPath?: string; autoSync?: boolean; syncIntervalMinutes?: number; autoEnroll?: boolean }) =>
-    req<{ rootPath: string; autoSync: boolean; syncIntervalMinutes: number; autoEnroll: boolean }>('/api/memory/config', { method: 'PUT', ...json(input) }),
+    req<{ rootPath: string; autoSync: boolean; syncIntervalMinutes: number; autoEnroll: boolean }>(
+      '/api/memory/config',
+      json(input, 'PUT'),
+    ),
   sync: () => req<SyncReport>('/api/memory/sync', { method: 'POST' }),
 };

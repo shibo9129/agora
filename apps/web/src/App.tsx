@@ -20,9 +20,8 @@ import type { KnowledgeBase } from './kb/api';
 import { useCountUp } from './hooks/useCountUp';
 import { useHubEvents } from './hooks/useHubEvents';
 import { SpotlightZone } from './components/SpotlightZone';
-import { AgoraLogo } from './components/AgoraLogo';
 import { Sidebar, type PageId } from './components/Sidebar';
-import { SettingsPanel } from './settings/SettingsPanel';
+import { onWindowDragMouseDown } from './desktop';
 import { useSettings, CURRENCY_SYMBOLS } from './settings/settings';
 import { getChartTheme, chartTooltipBase, useThemeTick } from './components/chart-theme';
 
@@ -85,7 +84,7 @@ export default function App() {
     window.location.hash = '/kb';
   }, []);
 
-  // The native menu bar (视图 menu, tray) drives navigation through this event
+  // The native menu bar (视图 menu) drives navigation through this event
   // rather than window.navigate(), so switching sections from the menu is the
   // same in-app transition as clicking the sidebar — no reload.
   useEffect(() => {
@@ -121,6 +120,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <div className="window-drag-bar" data-tauri-drag-region onMouseDown={onWindowDragMouseDown} />
       <Sidebar page={page} onNavigate={goto} />
       <main key={`${page}${openKb?.id ?? ''}`} className="page-enter app-main">
         <Suspense fallback={<PageSkeleton />}>

@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/node-%E2%89%A522-339933?logo=node.js&logoColor=white" alt="Node ≥ 22" />
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-lightgrey" alt="Platform" />
   <img src="https://img.shields.io/badge/privacy-local--only%20%C2%B7%20zero%20telemetry-blueviolet" alt="Local only, zero telemetry" />
-  <img src="https://img.shields.io/badge/version-0.1.8-orange" alt="v0.1.8" />
+  <img src="https://img.shields.io/badge/version-0.1.9-orange" alt="v0.1.9" />
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 
 | 模块 | 能力 |
 |---|---|
-| 📊 **用量看板** | 从各 Agent 本地会话记录聚合 token 与成本（LiteLLM 定价，未定价模型诚实报 `$0`）。按 今天/7 天/30 天/全部 × Agent/模型/项目 透视，支持 USD/CNY/EUR/HKD（联网实时汇率，可手动覆盖） |
+| 📊 **用量看板** | 从各 Agent 本地会话记录聚合 token 与成本（LiteLLM 定价，未定价模型诚实报 `$0`）。按 今天/7 天/30 天/全部 × Agent/模型/项目 透视，支持 USD/CNY/EUR/HKD（每 12 小时自动联网更新汇率） |
 | 🗂 **知识库** | 注册或按模板新建目录 → **treemap 透视**（CleanMyMac 式钻取）+ 文件名搜索（FTS5 中文友好）+ 按类型整理（可撤销）+ 一键在 Finder 打开 |
 | 🧰 **工具中心** | skill 统一视图 + 跨 Agent 开关矩阵（symlink 分发，**实体永不被移动**）；MCP 统一视图 + 配置漂移检测；官方 registry 市场一键安装；Git 安装 skill 到中央仓库并联网更新 |
 | 🧠 **记忆中枢** | 一键同步各 Agent 的记忆到中央仓库（**Markdown 为唯一事实源**，SQLite 只是可删索引）；自动同步模式会写入同步规则到各 Agent 入口文件并定时汇聚 |
@@ -77,7 +77,7 @@ Agora 把它们收进**一个** localhost 页面。数据不出本机，默认�
 > **≤0.1.3 旧版提示「已损坏 / damaged」？** 那些版本未做 Apple 公证，在终端执行一次
 > `xattr -c /Applications/Agora.app` 即可打开。0.1.4 起 dmg 已完成 Developer ID 签名 + 公证，无需此步骤。
 
-之后它常驻在**菜单栏**（关窗不退出）：左键图标可打开主界面、跳转用量看板/记忆中枢、或退出。数据全部在 `~/.agora/`（可用 `AGORA_HOME` 覆盖），零遥测。
+关窗后 app 仍在 Dock 里（点图标即可回到主界面）；**Agora → 退出** 或 ⌘Q 才真正退出。数据全部在 `~/.agora/`（可用 `AGORA_HOME` 覆盖），零遥测。
 
 > **开箱即采集**：app 启动即自动建立 server 并后台采集各 Agent 的历史用量，无需任何手动配置。
 > **自动接入**：同时自动检测本地已装 Agent（Claude Code / Codex / OpenCode / Gemini CLI / Grok / Qwen Code / Kimi Code / Amp / Crush / Aider / Amazon Q / Droid / iFlow CLI / Cursor / Windsurf / Zed / Hermes / Pi）并完成接入。

@@ -9,13 +9,10 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::tray::TrayIconBuilder;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 static SIDECAR: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
-static SIDECAR_PORT: OnceLock<u16> = OnceLock::new();
 
 fn home_dir() -> PathBuf {
     std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/"))
@@ -27,22 +24,6 @@ fn agora_home() -> PathBuf {
 
 fn pid_file() -> PathBuf {
     agora_home().join("app-sidecar.pid")
-}
-
-fn sidecar_port() -> u16 {
-    SIDECAR_PORT.get().copied().unwrap_or(7878)
-}
-
-fn show_window(app: &tauri::AppHandle, path: &str) {
-    if let Some(window) = app.get_webview_window("main") {
-        let url = format!("http://127.0.0.1:{}{}", sidecar_port(), path);
-        if let Ok(parsed) = url.parse() {
-            let _ = window.navigate(parsed);
-        }
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
 }
 
 /// Switch sections from a menu the way the app itself does — set the hash and
@@ -69,32 +50,12 @@ fn open_settings(app: &tauri::AppHandle) {
     }
 }
 
-fn build_tray(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
-    let open = MenuItem::with_id(app, "open", "打开 Agora", true, None::<&str>)?;
-    let usage = MenuItem::with_id(app, "usage", "用量看板", true, None::<&str>)?;
-    let memory = MenuItem::with_id(app, "memory", "记忆中枢", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &usage, &memory, &quit])?;
-
-    let icon_bytes: &[u8] = include_bytes!("../icons/32x32.png");
-    let icon = Image::from_bytes(icon_bytes).expect("tray icon");
-
-    TrayIconBuilder::new()
-        .icon(icon)
-        .tooltip("Agora — 本地 AI 中枢")
-        .menu(&menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "open" => show_window(app, "/"),
-            "usage" => go_to_section(app, "usage"),
-            "memory" => go_to_section(app, "memory"),
-            "quit" => {
-                app.exit(0);
-            }
-            _ => {}
-        })
-        .build(app)?;
-    Ok(())
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 }
 
 /// Standard macOS menu bar (App/Edit/Window) — without this, Tauri ships no
@@ -220,9 +181,10 @@ fn main() {
                 }
             }
         })
-        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Second launch: focus the existing window instead of spawning
             // a new sidecar (the plugin terminates this new process for us).
+            show_main_window(app);
         }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -231,8 +193,8 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         // Remember where the user put the window and how big they made it.
         // Only geometry: restoring `visible` would keep the window hidden on
-        // the next launch whenever the last session ended with it closed to
-        // the tray, which looks like the app failing to start.
+        // the next launch whenever the last session ended with the red button
+        // (macOS hide, not quit), which looks like the app failing to start.
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
@@ -242,11 +204,11 @@ fn main() {
                 )
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             reclaim_stale_sidecar();
             let port = pick_free_port();
-            let _ = SIDECAR_PORT.set(port);
 
             // sidecar binary is packed next to the app exe via externalBin
             let exe_dir = std::env::current_exe()
@@ -299,10 +261,9 @@ fn main() {
             }
 
             app.set_menu(build_menu(app.handle())?)?;
-            build_tray(app.handle())?;
 
-            // Closing the window hides it — the hub keeps running in the
-            // menu bar. Real exit happens via the tray 退出 item.
+            // Red button hides (macOS convention); Dock click / second launch
+            // brings it back. Real exit is Agora → 退出 / Cmd+Q.
             if let Some(window) = app.get_webview_window("main") {
                 let window_for_event = window.clone();
                 window.on_window_event(move |event| {
@@ -317,7 +278,7 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("error building agora desktop")
-        .run(|_app, event| match event {
+        .run(|app, event| match event {
             RunEvent::ExitRequested { .. } => {
                 if let Some(lock) = SIDECAR.get() {
                     if let Ok(mut guard) = lock.lock() {
@@ -327,6 +288,11 @@ fn main() {
                     }
                 }
                 let _ = fs::remove_file(pid_file());
+            }
+            RunEvent::Reopen { has_visible_windows, .. } => {
+                if !has_visible_windows {
+                    show_main_window(app);
+                }
             }
             _ => {}
         });

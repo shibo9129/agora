@@ -577,6 +577,18 @@ body::before {
   overflow: hidden;
 }
 
+/* Top of the content pane (the 22px padding) is also a drag strip so the
+   window can be moved from more than just the sidebar. */
+.window-drag-bar {
+  position: fixed;
+  top: 0;
+  left: 224px;
+  right: 0;
+  height: 18px;
+  z-index: 15;
+  -webkit-app-region: drag;
+}
+
 .app-main {
   flex: 1;
   overflow-y: auto;
@@ -601,15 +613,15 @@ body::before {
   z-index: 20;
 }
 
-/* Window-drag strip above the traffic lights' row — grabbing here (or the
-   brand row below) moves the window, since titleBarStyle:Overlay leaves the
-   whole top area as normal content otherwise. No-op outside Tauri. */
+/* Window-drag strip. Left inset clears the traffic lights so close/minimize
+   stay clickable; -webkit-app-region is a fallback for the data-attribute. */
 .sidebar-drag {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 88px;
   right: 0;
-  height: 40px;
+  height: 48px;
+  -webkit-app-region: drag;
 }
 
 .sidebar-brand {
@@ -617,6 +629,12 @@ body::before {
   align-items: center;
   gap: 10px;
   padding: 6px 10px 18px;
+  -webkit-app-region: drag;
+}
+.sidebar-brand button,
+.sidebar-item,
+.sidebar-footer {
+  -webkit-app-region: no-drag;
 }
 .sidebar-brand-name {
   font-size: 14.5px;

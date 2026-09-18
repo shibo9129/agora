@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { DirectoryPicker } from '../components/DirectoryPicker';
 import { LoadGate, usePageLoad } from '../components/LoadState';
 import { memoryApi, type HubAgentStatus, type MemoryConfig, type MemoryDocument, type MemoryEntry, type MemoryGroup } from './api';
 import { useHubEvents } from '../hooks/useHubEvents';
@@ -195,7 +196,8 @@ export function MemoryPage() {
     try {
       const next = await memoryApi.saveConfig({ autoSync: enabled });
       setCfg((prev) => (prev ? { ...prev, autoSync: next.autoSync } : prev));
-      showToast(enabled ? '自动同步已开启：已向各 Agent 写入记忆规则，每 10 分钟自动同步' : '自动同步已关闭：规则区块已移除');
+      const minutes = next.syncIntervalMinutes ?? cfg?.syncIntervalMinutes ?? 10;
+      showToast(enabled ? `自动同步已开启：已向各 Agent 写入记忆规则，每 ${minutes} 分钟自动同步` : '自动同步已关闭：规则区块已移除');
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e));
     }
@@ -243,7 +245,7 @@ export function MemoryPage() {
         </div>
         {tab === 'browse' && (
           <div className="flex items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--color-ink-dim)]" title="开启后：向各 Agent 写入记忆规则，并每 10 分钟自动同步">
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[var(--color-ink-dim)]" title={`开启后：向各 Agent 写入记忆规则，并每 ${cfg?.syncIntervalMinutes ?? 10} 分钟自动同步`}>
               <input
                 type="checkbox"
                 checked={cfg?.autoSync ?? false}
@@ -383,12 +385,14 @@ export function MemoryPage() {
               所有同步的记忆和精炼产物（MEMORY.md 根索引）都写入该目录。默认 <code className="font-mono">{cfg?.defaultRoot}</code>；
               也可以指向你已有的记忆库目录（例如某个 Obsidian vault 下的子文件夹），Agora 只新增/更新自己管理的文件，不碰库内其他内容。
             </p>
-            <input
-              value={cfgPath}
-              onChange={(e) => setCfgPath(e.target.value)}
-              className="input-field mb-4 w-full font-mono text-xs"
-              placeholder="/Users/you/path/to/memory"
-            />
+            <div className="mb-4">
+              <DirectoryPicker
+                value={cfgPath}
+                onChange={setCfgPath}
+                title="选择记忆仓库目录"
+                placeholder={cfg?.defaultRoot ?? '选择目录'}
+              />
+            </div>
             <div className="mb-4">
               <div className="section-title mb-2">自动同步间隔</div>
               <div className="flex flex-wrap items-center gap-2">

@@ -1,6 +1,6 @@
 {
   "name": "agora-hub",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Local AI agent hub — unified knowledge bases, skills/MCP management, shared memory, and token usage analytics",
   "license": "MIT",
   "type": "module",

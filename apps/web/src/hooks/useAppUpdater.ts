@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isTauri } from '../desktop';
 
 /** In-app update via tauri-plugin-updater (no-op in browser/dev). */
 export type UpdateState =
@@ -10,10 +11,6 @@ export type UpdateState =
   | { status: 'done' }
   | { status: 'uptodate'; version: string }
   | { status: 'error'; message: string };
-
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
 
 export function useAppUpdater() {
   const [state, setState] = useState<UpdateState>({ status: 'idle' });

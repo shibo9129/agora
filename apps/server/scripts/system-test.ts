@@ -99,6 +99,9 @@ console.log('\n== 功能测试 ==');
   const ratesBody = rates.body as { rates?: { CNY?: number }; source?: string };
   check('rates 返回且含 CNY', rates.status === 200 && typeof ratesBody.rates?.CNY === 'number');
   check('rates 来源标记', rates.status === 200 && ['frankfurter', 'cache', 'fallback'].includes(ratesBody.source ?? ''));
+
+  const settings = await getJson('/api/settings');
+  check('settings 返回币种', settings.status === 200 && typeof (settings.body as { currency?: string }).currency === 'string');
 }
 
 // ── 2. Performance ─────────────────────────────────────────────────────────

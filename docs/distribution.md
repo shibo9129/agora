@@ -66,5 +66,5 @@ macOS 桌面版（dmg + 应用内更新）发布见 `docs/release-desktop.md`（
 方案 A 的已知问题清单（集成时再处理）：
 - Tauri 进程退出时回收 spawn 的 Node 子进程（生命周期绑定）
 - 端口冲突检测（7878 被占时递增探测）
-- 菜单栏常驻 + 开机启动（Tauri 插件都有现成方案）
+- 开机启动（Tauri 插件有现成方案）
 - 前端无需改动（webview 直接加载 localhost 页面）

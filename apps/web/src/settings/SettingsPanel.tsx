@@ -45,17 +45,10 @@ export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' |
     return () => window.removeEventListener('agora:toggle-settings', onToggle);
   }, []);
 
-  const manualRate = settings.rates[settings.currency];
   const liveRate = settings.currency === 'USD' ? 1 : liveRates?.rates[settings.currency];
-  const effectiveRate = manualRate ?? liveRate ?? STATIC_FALLBACK_RATES[settings.currency];
+  const effectiveRate = liveRate ?? STATIC_FALLBACK_RATES[settings.currency];
   const rateSource =
-    manualRate !== undefined
-      ? '手动'
-      : liveRates?.source === 'frankfurter'
-        ? '实时'
-        : liveRates?.source === 'cache'
-          ? '缓存'
-          : '兜底';
+    liveRates?.source === 'frankfurter' ? '实时' : liveRates?.source === 'cache' ? '缓存' : liveRates ? '兜底' : '加载中';
 
   // bottom-left anchor (sidebar footer) opens upward and grows rightward so
   // the panel never spills past the window's left edge; top-right anchor
@@ -127,51 +120,14 @@ export function SettingsPanel({ placement = 'bottom' }: { placement?: 'bottom' |
             ))}
           </div>
           {settings.currency !== 'USD' && (
-            <div className="flex items-center justify-between text-xs text-[var(--color-ink-dim)]">
-              <span>
-                1 USD = <span className="num font-semibold text-[var(--color-ink)]">{effectiveRate}</span> {settings.currency}
-                <span className="ml-1.5 text-[10px] text-[var(--color-ink-faint)]">
-                  （{rateSource}
-                  {liveRates && liveRates.source !== 'fallback' && rateSource !== '手动'
-                    ? ` · 更新于 ${new Date(liveRates.fetchedAt).toLocaleTimeString()}`
-                    : ''}
-                  ）
-                </span>
-              </span>
-              <span className="flex items-center gap-1">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={String(liveRate ?? STATIC_FALLBACK_RATES[settings.currency])}
-                  value={manualRate ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === '') {
-                      const next = { ...settings.rates };
-                      delete next[settings.currency];
-                      update({ rates: next });
-                      return;
-                    }
-                    const v = Number(raw);
-                    if (v > 0) update({ rates: { ...settings.rates, [settings.currency]: v } });
-                  }}
-                  className="input-field w-20 !px-2 !py-1 text-right"
-                  title="留空则使用联网实时汇率"
-                />
-                {manualRate !== undefined && (
-                  <button
-                    onClick={() => {
-                      const next = { ...settings.rates };
-                      delete next[settings.currency];
-                      update({ rates: next });
-                    }}
-                    className="text-[10px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
-                    title="清除手动汇率，恢复联网汇率"
-                  >
-                    重置
-                  </button>
-                )}
+            <div className="text-xs text-[var(--color-ink-dim)]">
+              1 USD = <span className="num font-semibold text-[var(--color-ink)]">{effectiveRate}</span> {settings.currency}
+              <span className="ml-1.5 text-[10px] text-[var(--color-ink-faint)]">
+                （{rateSource}
+                {liveRates && liveRates.source !== 'fallback'
+                  ? ` · ${new Date(liveRates.fetchedAt).toLocaleString()} · 每 12 小时自动更新`
+                  : ' · 每 12 小时自动更新'}
+                ）
               </span>
             </div>
           )}

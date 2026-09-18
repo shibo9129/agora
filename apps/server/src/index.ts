@@ -31,7 +31,9 @@ import {
 import { localBoundary } from './security.js';
 import { kbRoutes } from './kb.js';
 import { memoryRoutes, hubRoutes } from './memory.js';
-import { ratesRoutes } from './rates.js';
+import { ratesRoutes, startRatesRefresh } from './rates.js';
+import { settingsRoutes } from './settings.js';
+import { systemRoutes } from './system.js';
 import { toolRoutes } from './tools.js';
 import { emitHubEvent, hubEvents, startRealtimeWatch, type HubEvent } from './watch.js';
 
@@ -181,6 +183,9 @@ app.route('/api/tools', toolRoutes());
 app.route('/api/memory', memoryRoutes(db));
 app.route('/api/hub', hubRoutes());
 app.route('/api/rates', ratesRoutes());
+app.route('/api/settings', settingsRoutes());
+app.route('/api/system', systemRoutes());
+startRatesRefresh();
 
 // ── Static web bundle (production build of apps/web) ─────────────────────
 // Layouts: bundled package → dist/web; dev checkout → apps/web/dist.
