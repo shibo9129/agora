@@ -42,11 +42,16 @@ export async function* readLines(path: string): AsyncGenerator<string> {
   }
 }
 
+/**
+ * `parserVersion` is part of the fingerprint: bumping it invalidates every
+ * stored fingerprint, so the next collection re-parses all sources. Bump it
+ * whenever a parser starts emitting a field old rows lack (v3: project_path).
+ */
 export async function fingerprint(path: string, sqlite = false): Promise<FileFingerprint | null> {
   try {
     const s = await stat(path);
     const wal = sqlite ? await stat(`${path}-wal`).then(w => `${w.ino}:${w.mtimeMs}:${w.size}`).catch((e: NodeJS.ErrnoException) => { if (e.code === 'ENOENT') return 'none'; throw e; }) : '';
-    return { dev: s.dev, ino: s.ino, mtimeMs: s.mtimeMs, sizeBytes: s.size, parserVersion: 2, wal };
+    return { dev: s.dev, ino: s.ino, mtimeMs: s.mtimeMs, sizeBytes: s.size, parserVersion: 3, wal };
   } catch {
     return null;
   }

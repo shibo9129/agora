@@ -24,13 +24,14 @@ export function openDb(dbPath: string = defaultDbPath()): Database.Database {
   return db;
 }
 
-function migrate(db: Database.Database): void {
+export function migrate(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS usage_records (
       dedupe_key TEXT PRIMARY KEY,
       agent TEXT NOT NULL,
       session_id TEXT NOT NULL,
       project TEXT,
+      project_path TEXT,
       model TEXT NOT NULL,
       ts TEXT NOT NULL,
       input_tokens INTEGER NOT NULL DEFAULT 0,
@@ -57,6 +58,15 @@ function migrate(db: Database.Database): void {
       last_collected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
   `);
+  // Additive migration for DBs created before project_path existed. Legacy
+  // rows keep NULL and fall back to the flattened `project` slug until the
+  // next collection re-parses their source (the parserVersion bump forces
+  // that), so nothing disappears from the dashboard in the meantime.
+  const columns = db.prepare('PRAGMA table_info(usage_records)').all() as { name: string }[];
+  if (!columns.some((c) => c.name === 'project_path')) {
+    db.exec('ALTER TABLE usage_records ADD COLUMN project_path TEXT');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_usage_project_path ON usage_records(project_path)');
 }
 
 export interface InsertResult {
@@ -67,15 +77,16 @@ export interface InsertResult {
 export function insertRecords(db: Database.Database, records: UsageRecord[], sourcePath: string, refresh = false): InsertResult {
   const stmt = db.prepare(`
     INSERT INTO usage_records
-      (dedupe_key, agent, session_id, project, model, ts,
+      (dedupe_key, agent, session_id, project, project_path, model, ts,
        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
        reasoning_tokens, web_search_requests, cost_usd, estimated, source_path)
     VALUES
-      (@dedupe_key, @agent, @session_id, @project, @model, @ts,
+      (@dedupe_key, @agent, @session_id, @project, @project_path, @model, @ts,
        @input_tokens, @output_tokens, @cache_read_tokens, @cache_write_tokens,
        @reasoning_tokens, @web_search_requests, @cost_usd, @estimated, @source_path)
     ON CONFLICT(dedupe_key) ${refresh ? `DO UPDATE SET
-      session_id=excluded.session_id, project=excluded.project, model=excluded.model,
+      session_id=excluded.session_id, project=excluded.project,
+      project_path=excluded.project_path, model=excluded.model,
       ts=excluded.ts, input_tokens=excluded.input_tokens, output_tokens=excluded.output_tokens,
       cache_read_tokens=excluded.cache_read_tokens, cache_write_tokens=excluded.cache_write_tokens,
       reasoning_tokens=excluded.reasoning_tokens, web_search_requests=excluded.web_search_requests,
@@ -91,6 +102,7 @@ export function insertRecords(db: Database.Database, records: UsageRecord[], sou
         agent: r.agent,
         session_id: r.sessionId,
         project: r.project ?? null,
+        project_path: r.projectPath ?? null,
         model: r.model,
         ts: r.timestamp,
         input_tokens: r.inputTokens,
@@ -247,16 +259,30 @@ export function queryHourly(db: Database.Database): HourlyUsage[] {
 }
 
 export interface ProjectBreakdown extends UsageTotals {
+  /** Grouping key: the absolute cwd when known, else the legacy slug. */
   project: string;
+  /** Absolute cwd when the agent recorded one — lets the UI show a real name. */
+  projectPath?: string | null;
 }
 
+/**
+ * Group by the real cwd when it is known. Agents disagreed on how to flatten a
+ * path into the legacy `project` slug (Claude Code kept the leading separator,
+ * everyone else stripped it), which split one project across two rows; keying
+ * on the path merges them and gives the UI something readable to display.
+ */
 export function queryByProject(db: Database.Database, days?: number): ProjectBreakdown[] {
   const { sql, params } = sinceClause(days);
   return db
     .prepare(
-      `SELECT COALESCE(project, '(unknown)') AS project, ${TOTALS_SQL}
+      // GROUP BY repeats the expression on purpose: SQLite resolves a bare
+      // `project` in GROUP BY to the table column, not to this alias, which
+      // would put the two slug spellings back into separate rows.
+      `SELECT COALESCE(NULLIF(project_path, ''), NULLIF(project, ''), '(unknown)') AS project,
+              NULLIF(project_path, '') AS "projectPath", ${TOTALS_SQL}
          FROM usage_records ${sql}
-        GROUP BY project ORDER BY "costUSD" DESC LIMIT 50`,
+        GROUP BY COALESCE(NULLIF(project_path, ''), NULLIF(project, ''), '(unknown)')
+        ORDER BY "costUSD" DESC LIMIT 50`,
     )
     .all(params) as ProjectBreakdown[];
 }

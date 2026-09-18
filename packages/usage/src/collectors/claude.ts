@@ -65,6 +65,8 @@ interface AssistantEntry {
   msgId: string;
   timestamp: string;
   sessionId?: string | undefined;
+  /** Session cwd — the readable project name behind the flattened slug. */
+  cwd?: string | undefined;
   model: string;
   input: number;
   output: number;
@@ -110,6 +112,7 @@ function parseAssistantEntry(line: string): AssistantEntry | null {
     msgId,
     timestamp: typeof entry['timestamp'] === 'string' ? entry['timestamp'] : new Date(0).toISOString(),
     sessionId: typeof entry['sessionId'] === 'string' ? entry['sessionId'] : undefined,
+    cwd: typeof entry['cwd'] === 'string' && entry['cwd'].length > 0 ? entry['cwd'] : undefined,
     model,
     input: safeNumber(usage['input_tokens']),
     output: safeNumber(usage['output_tokens']),
@@ -155,11 +158,13 @@ export const claudeCollector: UsageCollector = {
     // keep the LAST occurrence, with the timestamp of the FIRST.
     const byMsgId = new Map<string, AssistantEntry>();
     let sessionId: string | undefined;
+    let cwd: string | undefined;
     let fallbackSessionId = '';
     for await (const line of readLines(source.path)) {
       const entry = parseAssistantEntry(line);
       if (!entry) continue;
       if (!sessionId && entry.sessionId) sessionId = entry.sessionId;
+      if (!cwd && entry.cwd) cwd = entry.cwd;
       const prev = byMsgId.get(entry.msgId);
       byMsgId.set(entry.msgId, prev ? { ...entry, timestamp: prev.timestamp } : entry);
     }
@@ -184,6 +189,7 @@ export const claudeCollector: UsageCollector = {
         agent: AGENT,
         sessionId: sessionId ?? fallbackSessionId,
         project,
+        ...(cwd !== undefined ? { projectPath: cwd } : {}),
         model: entry.model,
         timestamp: entry.timestamp,
         inputTokens: entry.input,

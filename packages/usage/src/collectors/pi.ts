@@ -132,10 +132,12 @@ export const piCollector: UsageCollector = {
       }
 
       const project = cwd ? sanitizeProject(cwd) : source.project;
+      const projectPath = cwd;
       yield {
         agent: AGENT,
         sessionId: sessionId!,
         ...(project !== undefined ? { project } : {}),
+        ...(projectPath !== undefined ? { projectPath } : {}),
         model: recordModel,
         timestamp,
         inputTokens: input,

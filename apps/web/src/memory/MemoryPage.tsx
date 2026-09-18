@@ -76,13 +76,26 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-medium">{a.displayName}</span>
-              {a.mcpRegistered && <span className="rounded bg-emerald-950/60 px-1.5 py-0.5 text-xs text-emerald-400">MCP 已注册</span>}
+              {a.mcpRegistered && !a.mcpStale && (
+                <span className="rounded bg-emerald-950/60 px-1.5 py-0.5 text-xs text-emerald-400">MCP 已注册</span>
+              )}
+              {a.mcpStale && (
+                <span
+                  className="rounded bg-amber-950/60 px-1.5 py-0.5 text-xs text-amber-400"
+                  title="配置里的 agora server 指向了另一个位置（旧安装或已移动的 app），该 Agent 启动它会握手失败"
+                >
+                  MCP 指向旧路径
+                </span>
+              )}
               {a.entryBlockPresent && <span className="rounded bg-blue-950/60 px-1.5 py-0.5 text-xs text-blue-400">指引已注入</span>}
             </div>
+            {a.mcpStale && a.mcpCommand && (
+              <div className="mt-1 break-all font-mono text-[11px] text-amber-400/80">当前指向：{a.mcpCommand}</div>
+            )}
             {a.entryFilePath && <div className="mt-1 font-mono text-xs text-[var(--color-ink-dim)]">{a.entryFilePath}</div>}
           </div>
           {a.enrollable ? (
-            a.mcpRegistered && a.entryBlockPresent ? (
+            a.mcpRegistered && !a.mcpStale && a.entryBlockPresent ? (
               <button
                 disabled={busy === a.agent}
                 onClick={() => void act(a.agent, false)}
@@ -96,7 +109,7 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
                 onClick={() => void act(a.agent, true)}
                 className="btn-primary"
               >
-                {busy === a.agent ? '接入中…' : '一键接入'}
+                {busy === a.agent ? '接入中…' : a.mcpStale ? '修复注册' : '一键接入'}
               </button>
             )
           ) : (
@@ -105,6 +118,78 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
         </div>
       ))}
       {agents.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--color-edge-strong)] p-8 text-center text-[var(--color-ink-faint)]">未发现已安装的 Agent</div>}
+    </div>
+  );
+}
+
+/**
+ * The memory hub has three moving parts (central repo · MCP tools · sync) and
+ * none of them are visible from a list of files, so the page opened on a wall
+ * of synced notes with no way to tell what it was for. This collapses into a
+ * one-liner once read, and its state travels with the browser, not the server.
+ */
+function HowItWorks({ cfg, agentCount, entryCount }: { cfg: MemoryConfig | null; agentCount: number; entryCount: number }) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem('agora.memory.guide') !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+
+  const setOpenPersisted = (next: boolean) => {
+    setOpen(next);
+    try {
+      localStorage.setItem('agora.memory.guide', next ? 'open' : 'closed');
+    } catch {
+      // private window / blocked storage: the panel simply reopens next time
+    }
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpenPersisted(true)} className="mb-4 text-xs text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]">
+        记忆中枢是怎么用的？
+      </button>
+    );
+  }
+
+  return (
+    <div className="mb-4 card p-5">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <h3 className="text-sm font-medium">记忆中枢是怎么用的</h3>
+        <button onClick={() => setOpenPersisted(false)} className="shrink-0 text-xs text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]">
+          收起
+        </button>
+      </div>
+      <ol className="space-y-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+        <li>
+          <span className="font-medium text-[var(--color-ink)]">① 一个中央仓库。</span>{' '}
+          所有记忆都是这个目录下的 Markdown 文件——<span className="font-mono text-[var(--color-ink)]">{cfg?.rootPath ?? '…'}</span>
+          。Markdown 是唯一事实源，旁边的 SQLite 只是检索索引，删掉可以随时重建。你也可以把它指到自己的笔记库（「仓库设置」）。
+        </li>
+        <li>
+          <span className="font-medium text-[var(--color-ink)]">② Agent 通过 MCP 读写它。</span>{' '}
+          接入后每个 Agent 都拿到三个工具：<span className="font-mono">memory_search</span>（先搜，返回一行摘要 + 路径）、
+          <span className="font-mono">memory_read</span>（按需展开全文）、<span className="font-mono">memory_write</span>（把结论写回来）。
+          所以「共享记忆」不是自动发生的——是 Agent 在对话里主动调用这些工具。当前已接入 {agentCount} 个 Agent。
+        </li>
+        <li>
+          <span className="font-medium text-[var(--color-ink)]">③ 同步 = 把各 Agent 自己的记忆搬进来。</span>{' '}
+          「⟳ 同步」扫描各 Agent 的记忆目录，把里面的 .md 精炼后复制到 <span className="font-mono">synced/&lt;agent&gt;/</span>
+          （只读取，绝不修改 Agent 原文件）。「自动同步」= 每 {cfg?.syncIntervalMinutes ?? 10} 分钟做一次，
+          并在各 Agent 的入口文件里写一段规则，提醒它们把重要结论用 <span className="font-mono">memory_write</span> 写回中枢。
+        </li>
+      </ol>
+      <div className="mt-4 flex flex-wrap gap-4 border-t border-[var(--color-edge)] pt-3 text-[11px] text-[var(--color-ink-faint)]">
+        <span>当前 {entryCount} 条记忆</span>
+        <span>自动同步：{cfg?.autoSync ? `开启（每 ${cfg.syncIntervalMinutes} 分钟）` : '关闭'}</span>
+        <span>仓库：{cfg?.rootPath === cfg?.defaultRoot ? '默认位置' : '自定义位置'}</span>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
+        没看到记忆？先去「Agent 接入」确认 Agent 已接入，再点「⟳ 同步」；scope 为 <span className="font-mono">synced</span>{' '}
+        的来自各 Agent，其余是 Agent 通过 <span className="font-mono">memory_write</span> 直接写进中枢的。
+      </p>
     </div>
   );
 }
@@ -120,6 +205,7 @@ export function MemoryPage() {
   const [cfg, setCfg] = useState<MemoryConfig | null>(null);
   const [showCfg, setShowCfg] = useState(false);
   const [cfgPath, setCfgPath] = useState('');
+  const [enrolledCount, setEnrolledCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -143,6 +229,12 @@ export function MemoryPage() {
     const c = await memoryApi.config();
     setCfg(c);
     setCfgPath(c.rootPath);
+    try {
+      const { agents } = await memoryApi.hubStatus();
+      setEnrolledCount(agents.filter((a) => a.mcpRegistered && !a.mcpStale).length);
+    } catch {
+      // the guide degrades to "0 接入" rather than failing the page
+    }
   }, []);
 
   const loadState = usePageLoad(load);
@@ -277,6 +369,10 @@ export function MemoryPage() {
       )}
 
       {tab === 'enroll' && <EnrollPanel onToast={showToast} />}
+
+      {tab === 'browse' && (
+        <HowItWorks cfg={cfg} agentCount={enrolledCount} entryCount={groups.reduce((sum, g) => sum + g.count, 0)} />
+      )}
 
       {tab === 'browse' && (
         <LoadGate

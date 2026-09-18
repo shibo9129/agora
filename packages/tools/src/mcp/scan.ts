@@ -85,7 +85,7 @@ export function redactUrl(url: string): string {
   }
 }
 
-function signatureOf(spec: McpServerSpec): string {
+export function signatureOf(spec: McpServerSpec): string {
   if (spec.url) return `url:${redactUrl(spec.url)}`;
   if (spec.command) return `cmd:${spec.command.join(' ')}`;
   return 'unknown';
@@ -127,7 +127,8 @@ export async function scanMcpRegistrations(
   for (const [name, rawValue] of Object.entries(table)) {
     const raw = asRecord(rawValue);
     if (!raw) continue;
-    out.push({ agent: adapter.id, configPath: ref.path, serverName: name, spec: normalizeSpec(name, raw) });
+    const spec = normalizeSpec(name, raw);
+    out.push({ agent: adapter.id, configPath: ref.path, serverName: name, spec, signature: signatureOf(spec) });
   }
   return out;
 }
@@ -151,7 +152,7 @@ export async function scanUnifiedMcpServers(
         byName.set(reg.serverName, server);
       }
       server.registrations.push(reg);
-      if (signatureOf(reg.spec) !== server.signature) server.drift = true;
+      if (reg.signature !== server.signature) server.drift = true;
     }
   }
   for (const server of byName.values()) {

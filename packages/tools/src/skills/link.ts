@@ -98,6 +98,34 @@ export async function setSkillEnabled(
   return { skill: skillName, agent: agentId, action: 'disabled', detail: '已移除链接' };
 }
 
+export interface BrokenSkillLink {
+  skill: string;
+  agent: string;
+  path: string;
+  target: string;
+}
+
+/**
+ * Exactly what a prune would delete, without deleting anything. The confirm
+ * dialog shows this list: "清理" is only safe-looking if the user can see it
+ * touches nothing but dangling symlinks.
+ */
+export async function listBrokenSkillLinks(
+  env?: AdapterEnv,
+  adapters: AgentAdapter[] = builtinAdapters,
+): Promise<BrokenSkillLink[]> {
+  const out: BrokenSkillLink[] = [];
+  const seen = new Set<string>();
+  for (const skill of await scanUnifiedSkills(env, adapters)) {
+    for (const loc of skill.locations) {
+      if (loc.kind !== 'link' || loc.linkOk !== false || seen.has(loc.path)) continue;
+      seen.add(loc.path);
+      out.push({ skill: skill.name, agent: loc.agent, path: loc.path, target: loc.linkTarget ?? '?' });
+    }
+  }
+  return out;
+}
+
 /** Broken-link repair: remove skill symlinks whose targets vanished. */
 export async function pruneBrokenSkillLinks(
   env?: AdapterEnv,

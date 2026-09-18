@@ -7,6 +7,7 @@ import {
   type InstalledSkill,
   type RegistryServer,
   type UnifiedMcpServer,
+  type BrokenSkillLink,
   type UnifiedSkill,
   type UpdateStatus,
 } from './api';
@@ -432,22 +433,80 @@ function McpPanel({
     }
   };
 
+  const unify = async (server: UnifiedMcpServer, sourceAgent: string) => {
+    const key = `unify:${server.name}`;
+    setBusy(key);
+    try {
+      const r = await toolsApi.unifyMcp(server.name, sourceAgent);
+      const done = r.updated.map((u) => agentLabel(u.agent)).join('、');
+      onError(
+        r.updated.length === 0
+          ? `没有需要改写的注册${r.skipped.length ? `；跳过 ${r.skipped.map((x) => `${agentLabel(x.agent)}（${x.reason}）`).join('、')}` : ''}`
+          : `已把 ${done} 统一为 ${agentLabel(sourceAgent)} 的配置（写入前已备份）${
+              r.skipped.length ? `；跳过 ${r.skipped.map((x) => `${agentLabel(x.agent)}（${x.reason}）`).join('、')}` : ''
+            }`,
+      );
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      {servers.map((server) => (
+      {servers.map((server) => {
+        // Group agents by what they actually launch: with drift, the useful
+        // question is "which of these is right?", which needs the variants
+        // side by side, not one badge saying they disagree.
+        const variants = new Map<string, string[]>();
+        for (const reg of server.registrations) {
+          variants.set(reg.signature, [...(variants.get(reg.signature) ?? []), reg.agent]);
+        }
+        const sorted = [...variants.entries()].sort((a, b) => b[1].length - a[1].length);
+        return (
         <div key={server.name} className="card p-4">
           <div className="mb-2 flex items-center gap-3">
             <span className="font-mono font-medium">{server.name}</span>
-            <span className="text-xs text-[var(--color-ink-dim)]">{server.signature}</span>
+            {!server.drift && <span className="truncate text-xs text-[var(--color-ink-dim)]">{server.signature}</span>}
             {server.drift && (
               <span className="rounded bg-red-950/60 px-1.5 py-0.5 text-xs text-red-400" title="多个 Agent 中配置不一致">
                 配置漂移
               </span>
             )}
           </div>
+          {server.drift && (
+            <div className="mb-3 rounded-lg border border-red-900/40 bg-red-950/20 p-3">
+              <p className="mb-2 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+                这个 server 在不同 Agent 里指向了 {sorted.length} 种启动方式。指向旧路径的那几个会在握手时失败——
+                Agent 里看着「已注册」，实际用不了。选一份正确的，把其余对齐过去（写入前自动备份）：
+              </p>
+              <div className="space-y-1.5">
+                {sorted.map(([signature, agents]) => (
+                  <div key={signature} className="flex items-start justify-between gap-3 rounded-lg bg-[var(--color-panel-strong)]/60 px-2.5 py-2">
+                    <div className="min-w-0">
+                      <div className="text-xs text-[var(--color-ink)]">{agents.map(agentLabel).join('、')}</div>
+                      <div className="mt-0.5 break-all font-mono text-[10px] text-[var(--color-ink-dim)]">
+                        {signature.replace(/^(cmd|url):/, '')}
+                      </div>
+                    </div>
+                    <button
+                      disabled={busy === `unify:${server.name}`}
+                      onClick={() => void unify(server, agents[0]!)}
+                      className="shrink-0 rounded-lg border border-[var(--color-edge-strong)] px-2.5 py-1 text-xs text-[var(--color-ink-dim)] hover:border-emerald-600 hover:text-emerald-400 disabled:opacity-50"
+                      title={`把其他 Agent 的 ${server.name} 改写成这一份配置`}
+                    >
+                      统一为此配置
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {server.registrations.map((reg) => (
-              <span key={reg.agent} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-panel-strong)] px-2 py-1 text-xs">
+              <span key={reg.agent} className="flex items-center gap-1.5 rounded-lg bg-[var(--color-panel-strong)] px-2 py-1 text-xs" title={reg.configPath}>
                 <span>{agentLabel(reg.agent)}</span>
                 {detections.some((d) => d.id === reg.agent && d.mcpWritable === true) && (
                   <button
@@ -474,7 +533,8 @@ function McpPanel({
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
       {servers.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--color-edge-strong)] p-8 text-center text-[var(--color-ink-faint)]">未发现 MCP 注册</div>}
     </div>
   );
@@ -583,12 +643,86 @@ function RegistryDialog({
 
 // ── Health panel ──────────────────────────────────────────────────────────
 
-function HealthPanel({ issues, onPrune }: { issues: HealthIssue[]; onPrune: () => void }) {
+const ISSUE_KIND_LABEL: Record<string, string> = {
+  'mcp-drift': 'MCP 配置不一致',
+  'broken-skill-link': '失效链接',
+  'declared-missing': '配置残留',
+  'duplicate-skill-real': '重复实体拷贝',
+};
+
+function HealthPanel({
+  issues,
+  onPruned,
+  onError,
+  onGotoMcp,
+}: {
+  issues: HealthIssue[];
+  onPruned: () => void;
+  onError: (m: string) => void;
+  onGotoMcp: () => void;
+}) {
+  const [confirming, setConfirming] = useState<BrokenSkillLink[] | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [pruning, setPruning] = useState(false);
+
+  const brokenCount = issues.filter((i) => i.kind === 'broken-skill-link').length;
+  const errors = issues.filter((i) => i.severity === 'error').length;
+
+  // Never open the confirm blind: ask the server exactly which links it would
+  // delete, and show that list. Nothing is removed until the user has seen it.
+  const preview = async () => {
+    setLoadingPreview(true);
+    try {
+      const { links } = await toolsApi.brokenLinks();
+      setConfirming(links);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const runPrune = async () => {
+    setPruning(true);
+    try {
+      const r = await toolsApi.pruneSkills();
+      onError(r.removed.length === 0 ? '没有需要清理的失效链接' : `已清理 ${r.removed.length} 个失效链接（未删除任何实体文件）`);
+      setConfirming(null);
+      onPruned();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPruning(false);
+    }
+  };
+
   return (
     <div>
-      <div className="mb-3 flex justify-end">
-        <button onClick={onPrune} className="btn-ghost">
-          清理失效 skill 链接
+      <div className="mb-3 flex items-start justify-between gap-4 rounded-2xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-4">
+        <div className="min-w-0">
+          <div className="text-sm font-medium">
+            {issues.length === 0
+              ? '一切正常'
+              : `${issues.length} 条检查结果：${errors} 条需要处理，${issues.length - errors} 条仅供参考`}
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+            这里列的是「值得你知道」，不是「坏了」。黄色多半是历史遗留，放着不管也不影响使用；
+            红色才会让某个 Agent 真的用不了。每条都写了它是什么、要不要动它。
+            <strong className="text-[var(--color-ink)]">Agora 在这一页永远不会删除实体文件</strong>，
+            能清理的只有指向空目标的符号链接。
+          </p>
+        </div>
+        <button
+          onClick={() => void preview()}
+          disabled={brokenCount === 0 || loadingPreview}
+          className="btn-ghost shrink-0 disabled:opacity-40"
+          title={
+            brokenCount === 0
+              ? '当前没有失效链接，没有可清理的对象'
+              : `预览并清理 ${brokenCount} 个失效链接`
+          }
+        >
+          {loadingPreview ? '检查中…' : brokenCount === 0 ? '无失效链接' : `清理失效链接（${brokenCount}）`}
         </button>
       </div>
       <div className="space-y-2">
@@ -600,14 +734,71 @@ function HealthPanel({ issues, onPrune }: { issues: HealthIssue[]; onPrune: () =
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className={`inline-block h-2 w-2 rounded-full ${issue.severity === 'error' ? 'bg-red-500' : 'bg-yellow-500'}`} />
-              <span>{issue.message}</span>
+              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${issue.severity === 'error' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+              <span className="badge shrink-0 text-[10px] text-[var(--color-ink-dim)]">
+                {ISSUE_KIND_LABEL[issue.kind] ?? issue.kind}
+              </span>
+              <span className="min-w-0">{issue.message}</span>
             </div>
-            {issue.detail && <div className="mt-1 pl-4 font-mono text-xs text-[var(--color-ink-dim)]">{issue.detail}</div>}
+            {issue.detail && (
+              <div className="mt-1.5 whitespace-pre-line break-all pl-4 font-mono text-xs text-[var(--color-ink-dim)]">
+                {issue.detail}
+              </div>
+            )}
+            {issue.why && <div className="mt-2 pl-4 text-xs leading-relaxed text-[var(--color-ink-dim)]">{issue.why}</div>}
+            {issue.fix && (
+              <div className="mt-1 pl-4 text-xs leading-relaxed text-[var(--color-ink)]">
+                <span className="text-[var(--color-ink-faint)]">怎么办：</span>
+                {issue.fix}
+              </div>
+            )}
+            {issue.kind === 'mcp-drift' && (
+              <div className="mt-2 pl-4">
+                <button onClick={onGotoMcp} className="text-xs text-emerald-500 hover:text-emerald-400">
+                  去 MCP 页统一配置 →
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {issues.length === 0 && <div className="rounded-2xl border border-dashed border-[var(--color-edge-strong)] p-8 text-center text-[var(--color-ink-faint)]">一切正常 ✓</div>}
       </div>
+
+      {confirming && (
+        <ConfirmDialog
+          title="清理失效 skill 链接"
+          body={
+            confirming.length === 0 ? (
+              <>当前没有失效链接，无需清理。</>
+            ) : (
+              <>
+                将删除下列 {confirming.length} 个<span className="font-medium text-[var(--color-ink)]">符号链接</span>
+                ，它们指向的目标已经不存在，留着只会让对应 Agent 加载失败：
+                <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto rounded-lg bg-[var(--color-panel-strong)]/60 p-2">
+                  {confirming.map((l) => (
+                    <div key={l.path} className="text-[11px] leading-relaxed">
+                      <div className="font-medium text-[var(--color-ink)]">
+                        {l.skill} <span className="text-[var(--color-ink-faint)]">@ {agentLabel(l.agent)}</span>
+                      </div>
+                      <div className="break-all font-mono text-[var(--color-ink-dim)]">{l.path}</div>
+                      <div className="break-all font-mono text-red-400/80">↳ {l.target}（已不存在）</div>
+                    </div>
+                  ))}
+                </div>
+                <span className="mt-2 block rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs">
+                  只删除上面这些链接文件本身。任何实体 skill 目录、任何还能正常打开的链接，都不会被触碰。
+                </span>
+              </>
+            )
+          }
+          confirmLabel={confirming.length === 0 ? '知道了' : `删除这 ${confirming.length} 个链接`}
+          danger={confirming.length > 0}
+          busy={pruning}
+          wide
+          onConfirm={() => (confirming.length === 0 ? setConfirming(null) : void runPrune())}
+          onClose={() => setConfirming(null)}
+        />
+      )}
     </div>
   );
 }
@@ -748,12 +939,9 @@ export function ToolsPage() {
         {tab === 'health' && (
           <HealthPanel
             issues={issues}
-            onPrune={() => {
-              void toolsApi.pruneSkills().then((r) => {
-                showToast(`已清理 ${r.removed.length} 个失效链接`);
-                void reload();
-              });
-            }}
+            onPruned={() => void reload()}
+            onError={showToast}
+            onGotoMcp={() => setTab('mcp')}
           />
         )}
       </LoadGate>

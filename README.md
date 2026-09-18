@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/node-%E2%89%A522-339933?logo=node.js&logoColor=white" alt="Node ≥ 22" />
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-lightgrey" alt="Platform" />
   <img src="https://img.shields.io/badge/privacy-local--only%20%C2%B7%20zero%20telemetry-blueviolet" alt="Local only, zero telemetry" />
-  <img src="https://img.shields.io/badge/version-0.1.9-orange" alt="v0.1.9" />
+  <img src="https://img.shields.io/badge/version-0.1.10-orange" alt="v0.1.10" />
 </p>
 
 <p align="center">

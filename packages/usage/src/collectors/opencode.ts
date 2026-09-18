@@ -114,6 +114,8 @@ function* parseSession(
     : session.title
       ? sanitizeProject(session.title)
       : undefined;
+  // Only a real directory counts as a path; a session title is not one.
+  const projectPath = session.directory ?? undefined;
 
   let emitted = 0;
   for (const msg of messages) {
@@ -167,6 +169,7 @@ function* parseSession(
       agent: AGENT,
       sessionId: session.id,
       ...(project !== undefined ? { project } : {}),
+      ...(projectPath !== undefined ? { projectPath } : {}),
       model,
       timestamp: parseTimestamp(msg.time_created),
       inputTokens: input,
@@ -217,6 +220,7 @@ function* parseSession(
           agent: AGENT,
           sessionId: session.id,
           ...(project !== undefined ? { project } : {}),
+          ...(projectPath !== undefined ? { projectPath } : {}),
           model,
           timestamp: parseTimestamp(messages[0]!.time_created),
           inputTokens: input,

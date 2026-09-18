@@ -241,6 +241,12 @@ export const grokAdapter = makeAdapter({
     (await exists(join(home(e), '.grok', 'bin', 'grok'))) || (await whichBin('grok', e)) !== null,
   detectDetail: async (dir) => ((await exists(join(dir, 'config.toml'))) ? 'config.toml found' : undefined),
   skillDirs: (e) => [join(home(e), '.grok', 'skills')],
+  // memory-v2 keeps maintained Markdown topics per scope; the sync walker
+  // skips the sqlite indexes and observation dumps next to them.
+  memoryDirs: (e) => [
+    join(home(e), '.grok', 'memory-v2', 'global', 'topics'),
+    join(home(e), '.grok', 'memory-v2', 'workspaces'),
+  ],
   mcpConfig: (e) => ({ path: join(home(e), '.grok', 'config.toml'), format: 'toml' }),
   mcpWritable: true,
 });

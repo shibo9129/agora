@@ -19,7 +19,10 @@ export interface ModelBreakdown extends UsageTotals {
   agent: string;
 }
 export interface ProjectBreakdown extends UsageTotals {
+  /** Absolute cwd when known, else the legacy flattened slug. */
   project: string;
+  /** Present when the agent recorded a real directory. */
+  projectPath?: string | null;
 }
 export interface DailyUsage extends UsageTotals {
   day: string;

@@ -117,10 +117,12 @@ export const hermesCollector: UsageCollector = {
           const model = row.model || 'unknown';
           const nativeCost = Math.max(safeNumber(row.actual_cost_usd), safeNumber(row.estimated_cost_usd));
           const project = row.cwd ? sanitizeProject(row.cwd) : undefined;
+          const projectPath = row.cwd ?? undefined;
           yield {
             agent: AGENT,
             sessionId: row.session_id,
             ...(project !== undefined ? { project } : {}),
+            ...(projectPath !== undefined ? { projectPath } : {}),
             model,
             timestamp: parseTimestamp(row.last_seen ?? row.first_seen ?? 0),
             inputTokens: input,
@@ -156,10 +158,12 @@ export const hermesCollector: UsageCollector = {
         const model = row.model || 'unknown';
         const nativeCost = Math.max(safeNumber(row.actual_cost_usd), safeNumber(row.estimated_cost_usd));
         const project = row.cwd ? sanitizeProject(row.cwd) : undefined;
+        const projectPath = row.cwd ?? undefined;
         yield {
           agent: AGENT,
           sessionId: row.id,
           ...(project !== undefined ? { project } : {}),
+          ...(projectPath !== undefined ? { projectPath } : {}),
           model,
           timestamp: parseTimestamp(row.last_activity_at ?? row.started_at ?? 0),
           inputTokens: input,

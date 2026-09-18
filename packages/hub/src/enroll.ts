@@ -168,9 +168,35 @@ export interface HubAgentStatus {
   agent: string;
   displayName: string;
   mcpRegistered: boolean;
+  /**
+   * Registered under the right name but pointing somewhere else than the hub
+   * this process would write — a dev checkout left behind by an older install,
+   * a moved app bundle. The agent looks enrolled and fails at handshake time,
+   * so it has to be reported separately from "not registered".
+   */
+  mcpStale: boolean;
+  /** What the agent's config currently launches, for the UI to show. */
+  mcpCommand?: string;
   entryBlockPresent: boolean;
   entryFilePath?: string;
   enrollable: boolean;
+}
+
+/** The command this process would register, as a comparable string. */
+export function hubMcpCommandLine(): string {
+  return hubMcpSpec().command.join(' ');
+}
+
+/**
+ * True when the only registration this process can offer is the dev fallback
+ * (`npx tsx <checkout>`), which dies with the checkout. Running the hub from
+ * source must not repoint a machine's agents away from their installed app,
+ * so automatic repair stands down in that case — an explicit click still
+ * writes whatever this process is.
+ */
+export function hubMcpIsDevFallback(): boolean {
+  const [bin, ...rest] = hubMcpSpec().command;
+  return bin === 'npx' && rest.includes('tsx');
 }
 
 export async function hubStatus(env?: AdapterEnv, adapters: AgentAdapter[] = builtinAdapters): Promise<HubAgentStatus[]> {
@@ -180,9 +206,19 @@ export async function hubStatus(env?: AdapterEnv, adapters: AgentAdapter[] = bui
     const detection = await adapter.detect(env);
     if (!detection.installed) continue;
     let mcpRegistered = false;
+    let mcpStale = false;
+    let mcpCommand: string | undefined;
     try {
       const regs = await scanMcpRegistrations(adapter, env);
-      mcpRegistered = regs.some((r) => r.serverName === HUB_MCP_SERVER_NAME);
+      const hub = regs.find((r) => r.serverName === HUB_MCP_SERVER_NAME);
+      mcpRegistered = hub !== undefined;
+      if (hub) {
+        mcpCommand = hub.spec.command?.join(' ') ?? hub.spec.url ?? '';
+        // From a dev checkout there is no authoritative "correct" command to
+        // compare against, so nothing is reported stale — flagging a healthy
+        // packaged install as broken would be worse than staying quiet.
+        mcpStale = mcpCommand !== hubMcpCommandLine() && !hubMcpIsDevFallback();
+      }
     } catch {
       // unreadable config counts as not registered
     }
@@ -203,9 +239,11 @@ export async function hubStatus(env?: AdapterEnv, adapters: AgentAdapter[] = bui
       agent: adapter.id,
       displayName: adapter.displayName,
       mcpRegistered,
+      mcpStale,
       entryBlockPresent,
       enrollable: adapter.mcpWritable === true,
     };
+    if (mcpCommand !== undefined) status.mcpCommand = mcpCommand;
     if (entryFilePath !== undefined) status.entryFilePath = entryFilePath;
     out.push(status);
   }

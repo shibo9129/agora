@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import {
   checkUpdates,
   installSkill,
+  listBrokenSkillLinks,
   listInstalled,
   pruneBrokenSkillLinks,
   readMcpServerSpecRaw,
@@ -21,6 +22,7 @@ import {
   setSkillEnabled,
   uninstallSkill,
   updateSkill,
+  type McpWriteResult,
   type RegistryServer,
   type SkillSource,
 } from '@agora/tools';
@@ -48,6 +50,9 @@ export function toolRoutes(): Hono {
     }
   });
 
+  // Dry run first: the UI shows this list in the confirm dialog so "清理"
+  // stops being a leap of faith.
+  app.get('/skills/broken-links', async (c) => c.json({ links: await listBrokenSkillLinks() }));
   app.post('/skills/prune', async (c) => c.json(await pruneBrokenSkillLinks()));
 
   // ── Central store: install / update / uninstall ─────────────────────────
@@ -118,6 +123,48 @@ export function toolRoutes(): Hono {
       if (!rawSpec) return c.json({ error: `无法从 ${source.agent} 读取原始配置` }, 400);
       const result = await setMcpServerForAgent(body.agent, name, rawSpec);
       return c.json(result);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  // Unify: rewrite every drifting registration of this server to match one
+  // chosen agent's config. The raw spec is re-read inside this process, so the
+  // secrets the API redacts are carried over intact; each write backs up first.
+  app.post('/mcp/:name/unify', async (c) => {
+    const name = c.req.param('name');
+    const body = await c.req.json<{ sourceAgent?: string }>();
+    if (!body.sourceAgent) return c.json({ error: 'sourceAgent 必填' }, 400);
+    try {
+      const unified = await scanUnifiedMcpServers();
+      const server = unified.find((s) => s.name === name);
+      if (!server) return c.json({ error: `未知 MCP server: ${name}` }, 404);
+      const source = server.registrations.find((r) => r.agent === body.sourceAgent);
+      if (!source) return c.json({ error: `${body.sourceAgent} 没有 ${name} 的注册` }, 400);
+      const rawSpec = await readMcpServerSpecRaw(source.agent, name);
+      if (!rawSpec) return c.json({ error: `无法从 ${source.agent} 读取原始配置` }, 400);
+
+      const writable = new Set(
+        (await Promise.all(builtinAdapters.map(async (a) => ((await a.detect()).installed && a.mcpWritable === true ? a.id : null))))
+          .filter((id): id is string => id !== null),
+      );
+      const updated: McpWriteResult[] = [];
+      const skipped: { agent: string; reason: string }[] = [];
+      for (const reg of server.registrations) {
+        if (reg.agent === source.agent) continue;
+        if (reg.signature === source.signature) continue;
+        if (!writable.has(reg.agent)) {
+          skipped.push({ agent: reg.agent, reason: 'Agora 无法写入该 Agent 的配置' });
+          continue;
+        }
+        try {
+          const r = await setMcpServerForAgent(reg.agent, name, rawSpec);
+          updated.push(r);
+        } catch (err) {
+          skipped.push({ agent: reg.agent, reason: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      return c.json({ server: name, sourceAgent: source.agent, signature: source.signature, updated, skipped });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
     }

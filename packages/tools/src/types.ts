@@ -40,6 +40,8 @@ export interface McpRegistration {
   /** Server name as written in the config table. */
   serverName: string;
   spec: McpServerSpec;
+  /** This registration's own normalized signature — what drift compares. */
+  signature: string;
 }
 
 export interface UnifiedMcpServer {
@@ -58,6 +60,14 @@ export interface HealthIssue {
   severity: 'warn' | 'error';
   message: string;
   detail?: string;
+  /** What Agora saw, in one plain sentence — why this row is here at all. */
+  why?: string;
+  /** What the user should do, including "nothing, this is cosmetic". */
+  fix?: string;
+  /** Subject of the issue (server name, skill name, agent id) for actions. */
+  subject?: string;
+  /** Concrete filesystem paths the issue is about; a prune would touch these. */
+  paths?: string[];
 }
 
 export interface RegistryServer {

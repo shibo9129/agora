@@ -28,7 +28,7 @@ const ONE_HOUR_CACHE_WRITE_MULTIPLIER_FROM_FIVE_MINUTE_RATE = 1.6;
 const WEB_SEARCH_COST_PER_REQUEST = 0.01;
 
 /** Providers whose reported outputTokens already include reasoning tokens. */
-const REASONING_INCLUDED_IN_OUTPUT = new Set(['claude-code', 'codex', 'copilot', 'dsh']);
+const REASONING_INCLUDED_IN_OUTPUT = new Set(['claude-code', 'codex', 'copilot', 'dsh', 'grok']);
 
 export function billableOutputTokens(agent: string, outputTokens: number, reasoningTokens: number): number {
   return REASONING_INCLUDED_IN_OUTPUT.has(agent)

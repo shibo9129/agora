@@ -8,7 +8,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
-import { enrollAgent, hubStatus, setMemorySyncRule, unenrollAgent } from '@agora/hub';
+import { enrollAgent, hubMcpIsDevFallback, hubStatus, setMemorySyncRule, unenrollAgent } from '@agora/hub';
 import { MemoryStore, defaultMemoryRoot, syncAgentMemories, type MemoryScope, type MemoryWriteInput } from '@agora/memory';
 
 interface HubConfig {
@@ -110,7 +110,11 @@ export function memoryRoutes(db: Database.Database): Hono {
         result.skipped.push(s.agent);
         continue;
       }
-      if (s.mcpRegistered && s.entryBlockPresent) {
+      // A stale registration is worse than a missing one: the agent believes
+      // it has the hub and fails at handshake. Re-enrolling rewrites it —
+      // except from a dev checkout, which would hijack a working install.
+      const repairable = s.mcpStale && !hubMcpIsDevFallback();
+      if (s.mcpRegistered && !repairable && s.entryBlockPresent) {
         result.already.push(s.agent);
         continue;
       }
@@ -123,6 +127,10 @@ export function memoryRoutes(db: Database.Database): Hono {
     }
     if (result.enrolled.length > 0) {
       console.log(`[agora] 自动接入: ${result.enrolled.join(', ')}`);
+    }
+    const repaired = statuses.filter((s) => s.mcpStale && result.enrolled.includes(s.agent));
+    if (repaired.length > 0) {
+      console.log(`[agora] 修复了指向旧路径的 MCP 注册: ${repaired.map((s) => s.agent).join(', ')}`);
     }
     return result;
   };

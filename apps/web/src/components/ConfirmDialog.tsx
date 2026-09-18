@@ -7,6 +7,7 @@ export function ConfirmDialog({
   confirmLabel,
   danger,
   busy,
+  wide,
   onConfirm,
   onClose,
 }: {
@@ -15,12 +16,14 @@ export function ConfirmDialog({
   confirmLabel: string;
   danger?: boolean;
   busy: boolean;
+  /** For bodies that list paths — they are unreadable at the default width. */
+  wide?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={busy ? undefined : onClose}>
-      <div className="dialog-panel w-full max-w-sm card-pop p-5" onClick={(e) => e.stopPropagation()}>
+      <div className={`dialog-panel w-full card-pop p-5 ${wide ? 'max-w-xl' : 'max-w-sm'}`} onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-2 font-medium">{title}</h3>
         <div className="mb-5 text-sm leading-relaxed text-[var(--color-ink-dim)]">{body}</div>
         <div className="flex justify-end gap-2">

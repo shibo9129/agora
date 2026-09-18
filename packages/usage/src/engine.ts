@@ -10,6 +10,7 @@ import type Database from 'better-sqlite3';
 
 import { claudeCollector } from './collectors/claude.js';
 import { codexCollector } from './collectors/codex.js';
+import { grokCollector } from './collectors/grok.js';
 import { hermesCollector } from './collectors/hermes.js';
 import { opencodeCollector } from './collectors/opencode.js';
 import { piCollector } from './collectors/pi.js';
@@ -21,7 +22,14 @@ import {
 import type { CollectorEnv, UsageCollector, UsageRecord } from './types.js';
 import { fingerprint, sameFingerprint } from './collectors/shared.js';
 
-export const builtinCollectors: UsageCollector[] = [claudeCollector, codexCollector, opencodeCollector, hermesCollector, piCollector];
+export const builtinCollectors: UsageCollector[] = [
+  claudeCollector,
+  codexCollector,
+  grokCollector,
+  opencodeCollector,
+  hermesCollector,
+  piCollector,
+];
 
 export interface SourceReport {
   agent: string;

@@ -10,7 +10,10 @@ export interface UsageRecord {
   /** Agent id, e.g. 'claude-code' | 'codex' | 'opencode'. */
   agent: string;
   sessionId: string;
+  /** Legacy display slug (path with separators flattened to '-'). */
   project?: string;
+  /** Real absolute cwd when the agent records one — the readable name. */
+  projectPath?: string;
   model: string;
   /** ISO 8601 timestamp. */
   timestamp: string;
@@ -33,7 +36,7 @@ export interface UsageRecord {
 
 /** A discovered unit of raw usage data on disk. */
 export interface UsageSource {
-  kind: 'jsonl' | 'sqlite' | 'dir';
+  kind: 'jsonl' | 'json' | 'sqlite' | 'dir';
   /** Real file/db path. Virtual paths (db + session id) are allowed when
    *  the collector knows how to split them. */
   path: string;

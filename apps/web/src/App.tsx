@@ -214,6 +214,87 @@ function StatCard({
   );
 }
 
+
+/** How often the dashboard re-queries on its own (ms). */
+const AUTO_REFRESH_MS = 60_000;
+
+const RANGE_LABEL: Record<number, string> = { 1: '今天', 7: '近 7 天', 30: '近 30 天', 0: '全部时间' };
+
+/**
+ * Split a project key for display. Real cwds arrive as absolute paths, so the
+ * directory name is the readable part and the parent is context; legacy rows
+ * only have the flattened slug (`Users-me-Code-x`), which has to be shown
+ * whole because the flattening is not reversible.
+ */
+function projectName(row: ProjectBreakdown): { label: string; parent: string; full: string } {
+  const full = row.project;
+  if (row.projectPath) {
+    const parts = row.projectPath.split('/').filter(Boolean);
+    const label = parts[parts.length - 1] ?? row.projectPath;
+    return { label, parent: `/${parts.slice(0, -1).join('/')}`, full: row.projectPath };
+  }
+  if (full === '(unknown)') return { label: '未记录目录', parent: '', full };
+  return { label: full, parent: '', full };
+}
+
+type SortDir = 'asc' | 'desc';
+
+function useSort<K extends string>(initialKey: K) {
+  const [key, setKey] = useState<K>(initialKey);
+  const [dir, setDir] = useState<SortDir>('desc');
+  const toggle = useCallback(
+    (next: K) => {
+      // New column starts on its most useful end (big numbers first); the same
+      // column flips.
+      setKey((prev) => {
+        if (prev === next) setDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+        else setDir('desc');
+        return next;
+      });
+    },
+    [],
+  );
+  const sort = useCallback(
+    <T,>(rows: T[], value: (row: T, key: K) => number | string): T[] =>
+      [...rows].sort((a, b) => {
+        const va = value(a, key);
+        const vb = value(b, key);
+        const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        return dir === 'asc' ? cmp : -cmp;
+      }),
+    [key, dir],
+  );
+  return { key, dir, toggle, sort };
+}
+
+function SortHeader<K extends string>({
+  label,
+  column,
+  sort,
+  align = 'left',
+}: {
+  label: string;
+  column: K;
+  sort: { key: K; dir: SortDir; toggle: (k: K) => void };
+  align?: 'left' | 'right';
+}) {
+  const active = sort.key === column;
+  return (
+    <th className={`pb-2 pr-4 font-medium ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <button
+        onClick={() => sort.toggle(column)}
+        className={`inline-flex items-center gap-1 transition-colors hover:text-[var(--color-ink)] ${
+          active ? 'text-[var(--color-ink)]' : ''
+        }`}
+        title={`按${label}排序`}
+      >
+        {label}
+        <span className={active ? 'opacity-90' : 'opacity-30'}>{active && sort.dir === 'asc' ? '▲' : '▼'}</span>
+      </button>
+    </th>
+  );
+}
+
 function UsageDashboard() {
   const { formatMoney, settings } = useSettings();
   const [days, setDays] = useState<number>(30);
@@ -254,23 +335,46 @@ function UsageDashboard() {
 
   const loadState = usePageLoad(load);
   const { run: reload } = loadState;
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+
+  const refresh = useCallback(async () => {
+    await reload();
+    setRefreshedAt(new Date());
+  }, [reload]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void refresh();
+  }, [refresh]);
 
   // Live: hub pushes usage-updated when new agent data lands (real-time watch).
   useHubEvents({
-    onUsageUpdated: () => void reload(),
-    onAgentsUpdated: () => void reload(),
+    onUsageUpdated: () => void refresh(),
+    onAgentsUpdated: () => void refresh(),
   });
+
+  // Periodic re-query on top of the push channel: hub events only fire for
+  // sources the watcher sees, so a timer is what guarantees every panel on
+  // this page — cards, charts, model and project tables — keeps agreeing with
+  // the database and with the selected range. Paused while the window is
+  // hidden so a backgrounded app is not polling all night.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const timer = setInterval(tick, AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [refresh]);
 
   const onCollect = async () => {
     setCollecting(true);
     try {
       const report = await api.collect();
       setLastReport(report);
-      await reload();
+      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -279,6 +383,22 @@ function UsageDashboard() {
   };
 
   const themeTick = useThemeTick();
+  const modelSort = useSort<'model' | 'agent' | 'totalTokens' | 'outputTokens' | 'cacheReadTokens' | 'costUSD'>(
+    'costUSD',
+  );
+  const projectSort = useSort<'project' | 'totalTokens' | 'costUSD'>('costUSD');
+  const [showAllModels, setShowAllModels] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
+
+  const sortedModels = useMemo(
+    () => modelSort.sort(byModel, (row, key) => (key === 'agent' ? agentLabel(row.agent) : row[key])),
+    [byModel, modelSort],
+  );
+  const sortedProjects = useMemo(
+    () => projectSort.sort(byProject, (row, key) => (key === 'project' ? projectName(row).label : row[key])),
+    [byProject, projectSort],
+  );
+  const rangeLabel = RANGE_LABEL[days] ?? `近 ${days} 天`;
 
   const pieTotal = useMemo(() => byAgent.reduce((sum, a) => sum + a.totalTokens, 0), [byAgent]);
 
@@ -396,6 +516,10 @@ function UsageDashboard() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-end gap-3">
+        <span className="mr-auto text-[11px] text-[var(--color-ink-faint)]">
+          全页按「{rangeLabel}」联动查询
+          {refreshedAt && ` · 每分钟自动刷新，上次 ${refreshedAt.toLocaleTimeString()}`}
+        </span>
         <div className="flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
           {DAY_OPTIONS.map((o) => (
             <button
@@ -490,63 +614,101 @@ function UsageDashboard() {
       </section>
 
       <section className="mb-6 card p-4">
-        <h2 className="section-title mb-3">按模型</h2>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="section-title">按模型</h2>
+          <span className="text-[11px] text-[var(--color-ink-faint)]">
+            {rangeLabel} · {byModel.length} 个模型 · 点击表头排序
+          </span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--color-edge)] text-left text-[11px] text-[var(--color-ink-dim)]">
-                <th className="pb-2 pr-4 font-medium">模型</th>
-                <th className="pb-2 pr-4 font-medium">Agent</th>
-                <th className="pb-2 pr-4 text-right font-medium">Tokens</th>
-                <th className="pb-2 pr-4 text-right font-medium">输出</th>
-                <th className="pb-2 pr-4 text-right font-medium">缓存读</th>
-                <th className="pb-2 text-right font-medium">成本</th>
+                <SortHeader label="模型" column="model" sort={modelSort} />
+                <SortHeader label="Agent" column="agent" sort={modelSort} />
+                <SortHeader label="Tokens" column="totalTokens" sort={modelSort} align="right" />
+                <SortHeader label="输出" column="outputTokens" sort={modelSort} align="right" />
+                <SortHeader label="缓存读" column="cacheReadTokens" sort={modelSort} align="right" />
+                <SortHeader label="成本" column="costUSD" sort={modelSort} align="right" />
               </tr>
             </thead>
             <tbody>
-              {byModel.slice(0, 15).map((m) => (
+              {(showAllModels ? sortedModels : sortedModels.slice(0, 15)).map((m) => (
                 <tr key={`${m.agent}:${m.model}`} className="table-row-hover border-b border-[var(--color-edge)] last:border-0">
                   <td className="py-2.5 pr-4 font-mono text-xs text-[var(--color-ink)]">{m.model}</td>
                   <td className="py-2.5 pr-4 text-xs text-[var(--color-ink-dim)]">{agentLabel(m.agent)}</td>
                   <td className="num py-2.5 pr-4 text-right text-[var(--color-ink)]">{formatTokens(m.totalTokens)}</td>
                   <td className="num py-2.5 pr-4 text-right text-[var(--color-ink-dim)]">{formatTokens(m.outputTokens)}</td>
                   <td className="num py-2.5 pr-4 text-right text-[var(--color-ink-dim)]">{formatTokens(m.cacheReadTokens)}</td>
-                  <td className="num py-2.5 text-right font-semibold text-emerald-400">{formatMoney(m.costUSD)}</td>
+                  <td className="num py-2.5 pr-4 text-right font-semibold text-emerald-400">{formatMoney(m.costUSD)}</td>
                 </tr>
               ))}
               {byModel.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-[var(--color-ink-faint)]">
-                    暂无数据 — 点击「采集用量」从本地 Agent 会话记录汇总
+                    {days === 0
+                      ? '暂无数据 — 点击「采集用量」从本地 Agent 会话记录汇总'
+                      : `${rangeLabel}内没有用量 — 换个时间范围，或点击「采集用量」`}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {sortedModels.length > 15 && (
+          <button onClick={() => setShowAllModels((v) => !v)} className="mt-3 text-xs text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]">
+            {showAllModels ? '收起' : `展开全部 ${sortedModels.length} 个模型`}
+          </button>
+        )}
       </section>
 
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <div className="card p-4">
-          <h2 className="section-title mb-3">按项目</h2>
-          <table className="w-full text-sm">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="section-title">按项目</h2>
+            <span className="text-[11px] text-[var(--color-ink-faint)]">
+              {rangeLabel} · {byProject.length} 个项目
+            </span>
+          </div>
+          <table className="w-full table-fixed text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-edge)] text-left text-[11px] text-[var(--color-ink-dim)]">
+                <SortHeader label="项目" column="project" sort={projectSort} />
+                <SortHeader label="Tokens" column="totalTokens" sort={projectSort} align="right" />
+                <SortHeader label="成本" column="costUSD" sort={projectSort} align="right" />
+              </tr>
+            </thead>
             <tbody>
-              {byProject.slice(0, 10).map((p) => (
-                <tr key={p.project} className="table-row-hover border-b border-[var(--color-edge)] last:border-0">
-                  <td className="max-w-0 truncate py-2.5 pr-4 font-mono text-xs text-[var(--color-ink)]" title={p.project}>
-                    {p.project}
-                  </td>
-                  <td className="num py-2.5 pr-4 text-right text-[var(--color-ink-dim)]">{formatTokens(p.totalTokens)}</td>
-                  <td className="num py-2.5 text-right font-semibold text-emerald-400">{formatMoney(p.costUSD)}</td>
-                </tr>
-              ))}
+              {(showAllProjects ? sortedProjects : sortedProjects.slice(0, 10)).map((row) => {
+                const name = projectName(row);
+                return (
+                  <tr key={row.project} className="table-row-hover border-b border-[var(--color-edge)] last:border-0">
+                    {/* The directory name carries the meaning, so it gets the
+                        full-strength type and never truncates first; the parent
+                        path is context and is allowed to clip. */}
+                    <td className="py-2.5 pr-4" title={name.full}>
+                      <div className="truncate text-[13px] text-[var(--color-ink)]">{name.label}</div>
+                      {name.parent && (
+                        <div className="truncate font-mono text-[10px] text-[var(--color-ink-faint)]">{name.parent}</div>
+                      )}
+                    </td>
+                    <td className="num w-24 py-2.5 pr-4 text-right text-[var(--color-ink-dim)]">{formatTokens(row.totalTokens)}</td>
+                    <td className="num w-24 py-2.5 pr-4 text-right font-semibold text-emerald-400">{formatMoney(row.costUSD)}</td>
+                  </tr>
+                );
+              })}
               {byProject.length === 0 && (
                 <tr>
-                  <td className="py-8 text-center text-[var(--color-ink-faint)]">暂无数据</td>
+                  <td colSpan={3} className="py-8 text-center text-[var(--color-ink-faint)]">暂无数据</td>
                 </tr>
               )}
             </tbody>
           </table>
+          {sortedProjects.length > 10 && (
+            <button onClick={() => setShowAllProjects((v) => !v)} className="mt-3 text-xs text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]">
+              {showAllProjects ? '收起' : `展开全部 ${sortedProjects.length} 个项目`}
+            </button>
+          )}
         </div>
         <div className="card p-4">
           <h2 className="section-title mb-3">已检测的 Agent</h2>

@@ -147,6 +147,7 @@ export const codexCollector: UsageCollector = {
     const meta = await readSessionMeta(source.path);
     if (!meta) return;
     const project = meta.cwd ? sanitizeProject(meta.cwd) : undefined;
+    const projectPath = meta.cwd;
     let sessionModel = meta.model;
 
     // Cumulative counters (always advance to the latest total, whichever
@@ -271,6 +272,7 @@ export const codexCollector: UsageCollector = {
         agent: AGENT,
         sessionId: meta.sessionId,
         ...(project !== undefined ? { project } : {}),
+        ...(projectPath !== undefined ? { projectPath } : {}),
         model,
         timestamp: ts || new Date(0).toISOString(),
         inputTokens: billedInput,

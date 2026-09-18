@@ -33,6 +33,8 @@ export interface McpRegistration {
   configPath: string;
   serverName: string;
   spec: McpServerSpec;
+  /** This registration's own signature — differs from the server's on drift. */
+  signature: string;
 }
 
 export interface UnifiedMcpServer {
@@ -47,6 +49,25 @@ export interface HealthIssue {
   severity: 'warn' | 'error';
   message: string;
   detail?: string;
+  why?: string;
+  fix?: string;
+  subject?: string;
+  paths?: string[];
+}
+
+export interface BrokenSkillLink {
+  skill: string;
+  agent: string;
+  path: string;
+  target: string;
+}
+
+export interface UnifyResult {
+  server: string;
+  sourceAgent: string;
+  signature: string;
+  updated: { agent: string; action: string; configPath: string; backupPath?: string }[];
+  skipped: { agent: string; reason: string }[];
 }
 
 export type SkillSource =
@@ -100,6 +121,7 @@ export const toolsApi = {
   skills: () => req<{ skills: UnifiedSkill[] }>('/api/tools/skills'),
   toggleSkill: (name: string, agent: string, enable: boolean) =>
     req<{ action: string; detail: string }>(`/api/tools/skills/${encodeURIComponent(name)}/toggle`, json({ agent, enable })),
+  brokenLinks: () => req<{ links: BrokenSkillLink[] }>('/api/tools/skills/broken-links'),
   pruneSkills: () => req<{ removed: string[] }>('/api/tools/skills/prune', { method: 'POST' }),
   installed: () => req<{ installed: InstalledSkill[] }>('/api/tools/skills/installed'),
   installSkill: (source: SkillSource, linkTo: string[]) =>
@@ -114,6 +136,8 @@ export const toolsApi = {
       `/api/tools/mcp/${encodeURIComponent(name)}/toggle`,
       json({ agent, enable }),
     ),
+  unifyMcp: (name: string, sourceAgent: string) =>
+    req<UnifyResult>(`/api/tools/mcp/${encodeURIComponent(name)}/unify`, json({ sourceAgent })),
   registry: (q: string) => req<{ servers: RegistryServer[] }>(`/api/tools/mcp/registry?q=${encodeURIComponent(q)}`),
   installMcp: (agent: string, server: RegistryServer) => req<{ action: string }>('/api/tools/mcp/install', json({ agent, server })),
   health: () => req<{ issues: HealthIssue[] }>('/api/tools/health'),

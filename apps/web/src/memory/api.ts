@@ -26,6 +26,10 @@ export interface HubAgentStatus {
   agent: string;
   displayName: string;
   mcpRegistered: boolean;
+  /** Registered, but pointing at a different hub than this one — it will fail. */
+  mcpStale?: boolean;
+  /** What the agent's config currently launches. */
+  mcpCommand?: string;
   entryBlockPresent: boolean;
   entryFilePath?: string;
   enrollable: boolean;

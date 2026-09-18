@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { builtinAdapters } from '@agora/adapters';
-import { enrollAgent, hubStatus, unenrollAgent, HUB_MCP_SERVER_NAME } from '../index.js';
+import { enrollAgent, hubMcpIsDevFallback, hubStatus, unenrollAgent, HUB_MCP_SERVER_NAME } from '../index.js';
 
 let root: string;
 let env: { home: string; env: NodeJS.ProcessEnv };
@@ -89,5 +89,42 @@ describe('enroll/unenroll', () => {
     expect(jsonc).toContain('"agora"');
     expect(jsonc).toContain('mcp-stdio.ts');
     expect(existsSync(join(root, '.config/opencode/AGENTS.md'))).toBe(true);
+  });
+});
+
+describe('stale MCP registration detection', () => {
+  const ORIGINAL = process.env['AGORA_MCP_COMMAND'];
+
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env['AGORA_MCP_COMMAND'];
+    else process.env['AGORA_MCP_COMMAND'] = ORIGINAL;
+  });
+
+  it('flags a registration that points somewhere else than this hub', async () => {
+    process.env['AGORA_MCP_COMMAND'] = '/Applications/Agora.app/Contents/MacOS/hub mcp';
+    await enrollAgent('codex', memoryRoot, env, builtinAdapters);
+
+    // The app moved (reinstall, different path): same server name, dead command.
+    process.env['AGORA_MCP_COMMAND'] = '/Applications/Agora.app/Contents/MacOS/hub-v2 mcp';
+    const codex = (await hubStatus(env, builtinAdapters)).find((a) => a.agent === 'codex');
+    expect(codex?.mcpRegistered).toBe(true);
+    expect(codex?.mcpStale).toBe(true);
+    expect(codex?.mcpCommand).toBe('/Applications/Agora.app/Contents/MacOS/hub mcp');
+
+    // Re-enrolling is the repair.
+    await enrollAgent('codex', memoryRoot, env, builtinAdapters);
+    const fixed = (await hubStatus(env, builtinAdapters)).find((a) => a.agent === 'codex');
+    expect(fixed?.mcpStale).toBe(false);
+  });
+
+  it('reports nothing stale when the hub itself is a dev checkout', async () => {
+    process.env['AGORA_MCP_COMMAND'] = '/Applications/Agora.app/Contents/MacOS/hub mcp';
+    await enrollAgent('codex', memoryRoot, env, builtinAdapters);
+
+    // A source checkout cannot claim an installed app is wrong.
+    process.env['AGORA_MCP_COMMAND'] = 'npx -y tsx /Users/me/checkout/mcp-stdio.ts';
+    expect(hubMcpIsDevFallback()).toBe(true);
+    const codex = (await hubStatus(env, builtinAdapters)).find((a) => a.agent === 'codex');
+    expect(codex?.mcpStale).toBe(false);
   });
 });
