@@ -52,14 +52,18 @@ function EnrollPanel({ onToast }: { onToast: (msg: string) => void }) {
             开启后：中枢启动时自动检测本地已安装的 Agent 并完成接入（注册 MCP + 注入指引，全程幂等、自动备份）。
           </p>
         </div>
+        {/* The knob is a flex child, not an absolutely positioned one: with no
+            `left`, `position:absolute` falls back to the static position, which
+            a button centers — so the "on" knob sat 12px right of the track and
+            spilled out over the card's edge. */}
         <button
           onClick={() => void toggleAutoEnroll(!(autoEnroll ?? true))}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${(autoEnroll ?? true) ? 'bg-emerald-500' : 'bg-zinc-600'}`}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${(autoEnroll ?? true) ? 'bg-emerald-500' : 'bg-zinc-600'}`}
           role="switch"
           aria-checked={autoEnroll ?? true}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${(autoEnroll ?? true) ? 'translate-x-5' : 'translate-x-0.5'}`}
+            className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${(autoEnroll ?? true) ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
           />
         </button>
       </div>

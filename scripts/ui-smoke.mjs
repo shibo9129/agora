@@ -143,13 +143,25 @@ try {
       const sw = document.querySelector('[role="switch"]');
       if (!sw) return null;
       const r = sw.getBoundingClientRect();
-      const card = sw.parentElement.getBoundingClientRect();
-      const cs = getComputedStyle(sw.parentElement);
-      return { swR: r.right, cardR: card.right, shadow: cs.boxShadow !== 'none' };
+      // The card is the nearest surface, not merely the parent element —
+      // measuring against the parent made this check vacuous.
+      const host = sw.closest('.card') ?? sw.parentElement;
+      const card = host.getBoundingClientRect();
+      const knob = sw.firstElementChild?.getBoundingClientRect() ?? null;
+      return {
+        swR: r.right,
+        cardR: card.right,
+        shadow: getComputedStyle(host).boxShadow !== 'none',
+        // The knob lives inside the track; when it escapes (a mispositioned
+        // absolute child) it visibly spills over the card's edge.
+        knobInside: knob !== null && knob.left >= r.left - 0.5 && knob.right <= r.right + 0.5,
+        knobDetail: knob ? `knob=${Math.round(knob.left)}..${Math.round(knob.right)} track=${Math.round(r.left)}..${Math.round(r.right)}` : 'no knob',
+      };
     });
     check(`[${theme}] Agent 接入: toggle present`, !!enroll);
     if (enroll) {
       check(`[${theme}] Agent 接入: toggle inside card`, enroll.swR <= enroll.cardR + 2, `sw=${enroll.swR} card=${enroll.cardR}`);
+      check(`[${theme}] Agent 接入: knob inside its track`, enroll.knobInside, enroll.knobDetail);
       check(`[${theme}] Agent 接入: card visually lifted (shadow)`, enroll.shadow);
     }
     await page.screenshot({ path: `${SHOTS}/${theme}-memory-enroll.png` });

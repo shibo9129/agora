@@ -229,6 +229,19 @@ fn main() {
             None,
         ))
         .plugin(tauri_plugin_process::init())
+        // Remember where the user put the window and how big they made it.
+        // Only geometry: restoring `visible` would keep the window hidden on
+        // the next launch whenever the last session ended with it closed to
+        // the tray, which looks like the app failing to start.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             reclaim_stale_sidecar();

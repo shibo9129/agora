@@ -280,6 +280,8 @@ function UsageDashboard() {
 
   const themeTick = useThemeTick();
 
+  const pieTotal = useMemo(() => byAgent.reduce((sum, a) => sum + a.totalTokens, 0), [byAgent]);
+
   const pieOption = useMemo(
     () => {
       const ct = getChartTheme();
@@ -290,19 +292,31 @@ function UsageDashboard() {
         series: [
           {
             type: 'pie' as const,
-            radius: ['48%', '72%'],
+            // A slightly thicker ring so an inside "10.9%" clears both edges.
+            radius: ['42%', '72%'],
             itemStyle: { borderRadius: 8, borderColor: 'rgba(0,0,0,0.25)', borderWidth: 2 },
-            label: { color: ct.legend, fontSize: 11, formatter: '{b}\n{d}%' },
-            data: byAgent.map((a) => ({
-              name: agentLabel(a.agent),
-              value: a.totalTokens,
-              itemStyle: { color: agentColor(a.agent) },
-            })),
+            // Shares ride inside the ring instead of on leader lines: the old
+            // callouts fanned out to the left, collided with each other and
+            // got ellipsized ("H… 9…") as soon as the window narrowed. Names
+            // live in the legend below and in the tooltip; slices too thin to
+            // hold their own text (<5%) simply go unlabelled.
+            label: { position: 'inside', formatter: '{d}%', color: '#fff', fontSize: 10, fontWeight: 600 },
+            labelLine: { show: false },
+            labelLayout: { hideOverlap: true },
+            data: byAgent.map((a) => {
+              const share = pieTotal > 0 ? (a.totalTokens / pieTotal) * 100 : 0;
+              return {
+                name: agentLabel(a.agent),
+                value: a.totalTokens,
+                itemStyle: { color: agentColor(a.agent) },
+                ...(share < 5 ? { label: { show: false } } : {}),
+              };
+            }),
           },
         ],
       };
     },
-    [byAgent, themeTick],
+    [byAgent, pieTotal, themeTick],
   );
 
   const dailyTotalCost = useMemo(() => {
