@@ -56,6 +56,15 @@ const health = await (async () => {
   process.exit(1);
 })();
 
+/** Pages now render a skeleton until their first fetch lands — sweeping before
+ *  that would inspect placeholders instead of the real controls. */
+const settled = async (page) => {
+  await page
+    .waitForFunction(() => document.querySelectorAll('.app-main .skeleton').length === 0, { timeout: 15000 })
+    .catch(() => {});
+  await new Promise((r) => setTimeout(r, 250));
+};
+
 let failed = 0;
 const check = (name, ok, detail = '') => {
   console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`);
@@ -112,7 +121,7 @@ try {
       await page.evaluate((nav) => {
         [...document.querySelectorAll('.sidebar-item')].find((b) => b.textContent.includes(nav))?.click();
       }, p.nav);
-      await new Promise((r) => setTimeout(r, 700));
+      await settled(page);
       const sweep = await page.evaluate(SWEEP_FN);
       check(`[${theme}] ${p.nav}: no horizontal overflow`, !sweep.overflowX);
       check(`[${theme}] ${p.nav}: controls inside window`, sweep.offWindow.length === 0, sweep.offWindow.join(','));
@@ -125,7 +134,7 @@ try {
     await page.evaluate(() => {
       [...document.querySelectorAll('.sidebar-item')].find((b) => b.textContent.includes('记忆中枢'))?.click();
     });
-    await new Promise((r) => setTimeout(r, 600));
+    await settled(page);
     await page.evaluate(() => {
       [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Agent 接入')?.click();
     });
@@ -150,12 +159,19 @@ try {
       await page.evaluate(() => {
         [...document.querySelectorAll('.sidebar-item')].find((b) => b.textContent.includes('用量看板'))?.click();
       });
-      await new Promise((r) => setTimeout(r, 900));
       await page.waitForSelector('.sidebar-version', { timeout: 10000 });
       const label = await page.$eval('.sidebar-version', (el) => el.textContent);
       check('sidebar version matches /api/health', label === `v${health.version}`, `${label} vs v${health.version}`);
-      const titles = await page.$$eval('.section-title', (els) => els.map((e) => e.textContent ?? ''));
-      check('agent donut shows Token share', titles.some((t) => t.includes('Token 占比')));
+      // The dashboard renders a skeleton until its first fetch resolves, and on
+      // a large usage db that can outlast any fixed sleep — wait for the real
+      // content instead of racing it.
+      const donutUp = await page
+        .waitForFunction(
+          () => [...document.querySelectorAll('.section-title')].some((e) => (e.textContent ?? '').includes('Token 占比')),
+          { timeout: 15000 },
+        )
+        .then(() => true, () => false);
+      check('agent donut shows Token share', donutUp);
 
       await page.click('button[aria-label="设置"]');
       await new Promise((r) => setTimeout(r, 400));

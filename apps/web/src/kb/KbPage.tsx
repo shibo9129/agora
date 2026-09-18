@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LoadGate, Skeleton, usePageLoad } from '../components/LoadState';
 import { formatBytes, kbApi, type KnowledgeBase, type KbTemplate } from './api';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -123,20 +124,22 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
   const [pendingRemove, setPendingRemove] = useState<KnowledgeBase | null>(null);
   const [removing, setRemoving] = useState(false);
 
-  const load = async () => {
-    try {
-      const [l, t] = await Promise.all([kbApi.list(), kbApi.templates()]);
-      setKbs(l.kbs);
-      setTemplates(t.templates);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  // Rejections propagate to usePageLoad, which tells "still loading" apart
+  // from "no knowledge bases yet" — the empty state below is a claim, and it
+  // must not be made before the first fetch has actually answered.
+  const load = useCallback(async () => {
+    const [l, t] = await Promise.all([kbApi.list(), kbApi.templates()]);
+    setKbs(l.kbs);
+    setTemplates(t.templates);
+    setError(null);
+  }, []);
+
+  const loadState = usePageLoad(load);
+  const { run: reload } = loadState;
 
   useEffect(() => {
-    void load();
-  }, []);
+    void reload();
+  }, [reload]);
 
   const cards = useMemo(() => kbs, [kbs]);
 
@@ -146,7 +149,7 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
     try {
       await kbApi.remove(pendingRemove.id);
       setPendingRemove(null);
-      await load();
+      await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setPendingRemove(null);
@@ -170,8 +173,22 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
         </button>
       </div>
 
-      {error && <div className="mb-4 rounded-lg bg-red-950/50 p-3 text-sm text-red-300">{error}</div>}
+      {/* Failures of a *later* refresh keep the list on screen — say so here
+          rather than silently showing stale data. */}
+      {(error ?? (loadState.loaded ? loadState.error : null)) && (
+        <div className="mb-4 rounded-lg bg-red-950/50 p-3 text-sm text-red-300">{error ?? loadState.error}</div>
+      )}
 
+      <LoadGate
+        state={loadState}
+        skeleton={
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-28" />
+            ))}
+          </div>
+        }
+      >
       {cards.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--color-edge-strong)] p-12 text-center text-[var(--color-ink-faint)]">
           还没有知识库 — 点击右上角「新建 / 注册」开始
@@ -222,8 +239,9 @@ export function KbPage({ onOpenKb }: { onOpenKb: (kb: KnowledgeBase) => void }) 
           ))}
         </div>
       )}
+      </LoadGate>
 
-      {showDialog && <CreateDialog templates={templates} onClose={() => setShowDialog(false)} onCreated={() => void load()} />}
+      {showDialog && <CreateDialog templates={templates} onClose={() => setShowDialog(false)} onCreated={() => void reload()} />}
 
       {pendingRemove && (
         <ConfirmDialog

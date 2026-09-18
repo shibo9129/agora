@@ -47,6 +47,18 @@ describe('enroll/unenroll', () => {
     expect(agents).toContain('MEMORY.md');
   });
 
+  it('records ownership under the enrolled home, never the real ~/.agora', async () => {
+    // Regression: the manifest path used to come from the process environment,
+    // so a run against a sandboxed home (this test, a second profile) wrote its
+    // entries into the developer's real ~/.agora — where unenroll could never
+    // match them again, and where they accumulated as paths to deleted dirs.
+    const manifest = join(root, '.agora/hub-manifest.json');
+    expect(existsSync(manifest)).toBe(true);
+    const { files } = JSON.parse(readFileSync(manifest, 'utf-8')) as { files: Record<string, string[]> };
+    expect(Object.keys(files).length).toBeGreaterThan(0);
+    for (const filePath of Object.keys(files)) expect(filePath.startsWith(root)).toBe(true);
+  });
+
   it('reports status correctly', async () => {
     const status = await hubStatus(env, builtinAdapters);
     const codex = status.find((s) => s.agent === 'codex')!;

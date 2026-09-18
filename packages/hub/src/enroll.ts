@@ -97,7 +97,7 @@ export async function enrollAgent(
     entryFile = { skipped: true, reason: '该 agent 无入口文件约定' };
   } else {
     const entryPath = join(detection.configHome, entryName);
-    const r = await upsertManagedBlock(entryPath, HUB_BLOCK_ID, guideBlock(memoryRoot));
+    const r = await upsertManagedBlock(entryPath, HUB_BLOCK_ID, guideBlock(memoryRoot), env);
     entryFile = { path: entryPath, action: r.action };
   }
 
@@ -127,7 +127,7 @@ export async function unenrollAgent(
     entryFile = { skipped: true, reason: '该 agent 无入口文件约定' };
   } else {
     const entryPath = join(detection.configHome, entryName);
-    const r = await removeManagedBlock(entryPath, HUB_BLOCK_ID);
+    const r = await removeManagedBlock(entryPath, HUB_BLOCK_ID, env);
     entryFile = { path: entryPath, action: r.action };
   }
 
@@ -157,10 +157,10 @@ export async function setMemorySyncRule(
   const detection = await adapter.detect(env);
   const entryPath = join(detection.configHome, entryName);
   if (enable) {
-    const r = await upsertManagedBlock(entryPath, HUB_SYNC_RULE_BLOCK_ID, syncRuleBlock(memoryRoot));
+    const r = await upsertManagedBlock(entryPath, HUB_SYNC_RULE_BLOCK_ID, syncRuleBlock(memoryRoot), env);
     return { agent: agentId, action: r.action, path: entryPath };
   }
-  const r = await removeManagedBlock(entryPath, HUB_SYNC_RULE_BLOCK_ID);
+  const r = await removeManagedBlock(entryPath, HUB_SYNC_RULE_BLOCK_ID, env);
   return { agent: agentId, action: r.action, path: entryPath };
 }
 

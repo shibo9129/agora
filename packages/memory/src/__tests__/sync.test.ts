@@ -26,6 +26,15 @@ beforeAll(() => {
     join(root, '.codex/memories/raw_memories.md'),
     '---\nname: 偏好事实\nabstract: Stan 偏好先给结论再给依据\n---\n\n沟通风格偏好。',
   );
+  writeFileSync(
+    join(root, '.codex/memories/rollout_summaries/2026-09-08.md'),
+    'thread_id: 01a07f08-5cb8-78e0-9020-18150a88d486\nupdated_at: 2026-09-08T04:20:26+00:00\ncwd: /Users/x/Mobile Documents/notes\n\n把测试库从组织级全产品库收缩为个人助手测试库，并完成分层清理。',
+  );
+  mkdirSync(join(root, '.codex/memories/skills/wiki-patrol'), { recursive: true });
+  writeFileSync(
+    join(root, '.codex/memories/skills/wiki-patrol/SKILL.md'),
+    'Use this for:\n\n- routing a wiki patrol request to the right sync job\n- checking which pages drifted',
+  );
   writeFileSync(join(root, '.codex/memories/MEMORY.md'), '# index (should be skipped)');
   writeFileSync(join(root, '.codex/memories/USER.md.bak'), 'backup, skipped');
   // hermes memories
@@ -41,12 +50,12 @@ describe('syncAgentMemories', () => {
   it('syncs markdown memories from agent dirs into synced/<agent>/', async () => {
     const report = await syncAgentMemories(store, env, builtinAdapters);
     const codex = report.agents.find((a) => a.agent === 'codex')!;
-    expect(codex.synced).toBe(2); // MEMORY.md and .bak skipped
+    expect(codex.synced).toBe(4); // MEMORY.md and .bak skipped
     const hermes = report.agents.find((a) => a.agent === 'hermes')!;
     expect(hermes.synced).toBe(1);
 
     const entries = store.list('synced', 'codex');
-    expect(entries.length).toBe(2);
+    expect(entries.length).toBe(4);
     const titles = entries.map((e) => e.name).join('|');
     expect(titles).toContain('部署流水线迁移完成');
     expect(titles).toContain('偏好事实');
@@ -59,6 +68,23 @@ describe('syncAgentMemories', () => {
     expect(rollout.abstract).toContain('完成了从老流水线到 N12 的迁移');
     const hermes = store.list('synced', 'hermes')[0]!;
     expect(hermes.abstract).toContain('Stanshek');
+  });
+
+  it('skips machine metadata and bare lead-ins when deriving an abstract', async () => {
+    // Both of these produced useless abstracts on real data: an ISO timestamp
+    // (the old metadata pattern could not match the `+00:00` offset) and the
+    // dangling "Use this for:" that introduces a list.
+    const entries = store.list('synced', 'codex');
+    const rollout = entries.find((e) => e.abstract.includes('分层清理'))!;
+    expect(rollout).toBeDefined();
+    expect(rollout.abstract).not.toContain('2026-09-08T04:20:26');
+    expect(rollout.abstract).not.toContain('thread_id');
+    expect(rollout.abstract).not.toContain('Mobile Documents'); // `cwd: /path with spaces`
+
+    const skill = entries.find((e) => e.abstract.includes('wiki patrol'))!;
+    expect(skill).toBeDefined();
+    expect(skill.abstract).toContain('Use this for:');
+    expect(skill.abstract.length).toBeGreaterThan('Use this for:'.length);
   });
 
   it('uses frontmatter abstract when present', async () => {

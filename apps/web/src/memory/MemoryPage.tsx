@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { LoadGate, usePageLoad } from '../components/LoadState';
 import { memoryApi, type HubAgentStatus, type MemoryConfig, type MemoryDocument, type MemoryEntry, type MemoryGroup } from './api';
 import { useHubEvents } from '../hooks/useHubEvents';
 
@@ -139,27 +140,30 @@ export function MemoryPage() {
     setCfgPath(c.rootPath);
   }, []);
 
+  const loadState = usePageLoad(load);
+  const { run: reload } = loadState;
+
   useEffect(() => {
-    void load();
+    void reload();
     void loadConfig();
-  }, [load, loadConfig]);
+  }, [reload, loadConfig]);
 
   // Live reload when a sync lands new memories or enrollment changes.
   useHubEvents({
-    onUsageUpdated: () => void load(),
-    onAgentsUpdated: () => void load(),
+    onUsageUpdated: () => void reload(),
+    onAgentsUpdated: () => void reload(),
   });
 
   useEffect(() => {
     if (query.trim().length === 0) {
-      void load();
+      void reload();
       return;
     }
     const t = setTimeout(() => {
       void memoryApi.search(query).then((r) => setEntries(r.hits));
     }, 250);
     return () => clearTimeout(t);
-  }, [query, load]);
+  }, [query, reload]);
 
   const openDoc = async (path: string) => {
     try {
@@ -175,7 +179,7 @@ export function MemoryPage() {
       const report = await memoryApi.sync();
       const perAgent = report.agents.filter((a) => a.synced > 0).map((a) => `${a.agent} ${a.synced}`).join(' · ');
       showToast(report.totalSynced > 0 ? `已同步 ${report.totalSynced} 条记忆（${perAgent}）` : '未发现可同步的 Agent 记忆');
-      await load();
+      await reload();
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e));
     } finally {
@@ -199,7 +203,7 @@ export function MemoryPage() {
       setCfg((prev) => (prev ? { ...prev, rootPath: next.rootPath } : prev));
       setShowCfg(false);
       showToast(`中央仓库已切换：${next.rootPath}（索引已重建）`);
-      await load();
+      await reload();
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e));
     }
@@ -260,11 +264,24 @@ export function MemoryPage() {
         )}
       </div>
 
-      {toast && <div className="mb-4 rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel-strong)]/80 p-3 text-sm text-[var(--color-ink)]">{toast}</div>}
+      {(toast ?? (loadState.loaded ? loadState.error : null)) && (
+        <div className="mb-4 rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel-strong)]/80 p-3 text-sm text-[var(--color-ink)]">
+          {toast ?? `刷新失败：${loadState.error ?? ''}`}
+        </div>
+      )}
 
       {tab === 'enroll' && <EnrollPanel onToast={showToast} />}
 
       {tab === 'browse' && (
+        <LoadGate
+          state={loadState}
+          skeleton={
+            <div className="grid gap-4 lg:grid-cols-4">
+              <div className="skeleton h-64" />
+              <div className="skeleton h-64 lg:col-span-3" />
+            </div>
+          }
+        >
         <div className="grid gap-4 lg:grid-cols-4">
           <div className="card p-3">
             <button
@@ -309,7 +326,7 @@ export function MemoryPage() {
                         void memoryApi.remove(doc.path).then(() => {
                           showToast('已删除');
                           setDoc(null);
-                          void load();
+                          void reload();
                         });
                       }}
                       className="btn-danger-ghost"
@@ -351,6 +368,7 @@ export function MemoryPage() {
             )}
           </div>
         </div>
+        </LoadGate>
       )}
 
       {showCfg && (

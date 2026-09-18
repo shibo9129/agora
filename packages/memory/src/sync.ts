@@ -54,21 +54,41 @@ function extractTitle(data: Record<string, unknown>, body: string, fallback: str
   return fallback;
 }
 
+/**
+ * A machine metadata line: an ASCII key and a value with no spaces —
+ * `thread_id: 01a07f08…`, `updated_at: 2026-09-08T04:20:26+00:00`,
+ * `model = gpt-5.1`. The value pattern is deliberately "any single token":
+ * the previous `[\w:-]{6,}` missed ISO timestamps (the `+` in the offset), so
+ * agent rollout dumps ended up with a timestamp as their one-line abstract.
+ * A value that starts with `/` or `~` counts too, so `cwd: /Users/…/My Docs`
+ * is metadata despite the space. Prose is safe — an English sentence after a
+ * colon has spaces, and a Chinese key does not match the ASCII-only key.
+ */
+const META_LINE_RE = /^[A-Za-z_][\w .\-/]{0,39}\s*[:=]\s*(?:\S+|[~/]\S*(?: \S+)*)$/;
+
 function extractAbstract(data: Record<string, unknown>, body: string, fallbackTitle: string): string {
   if (typeof data['abstract'] === 'string' && data['abstract'].trim().length > 0) {
     return data['abstract'].trim().slice(0, MAX_ABSTRACT_CHARS);
   }
-  // First non-empty content line, skipping headings, quotes, HTML comments,
-  // and machine metadata lines (threadid:/session-id: style).
-  const metaRe = /^[\w-]+\s*[:=]\s*[\w:-]{6,}$/i;
+  // Content lines, skipping headings, quotes, HTML comments and metadata.
+  const parts: string[] = [];
   for (const line of body.split('\n')) {
     const t = line.trim();
     if (t.length === 0 || t.startsWith('#') || t.startsWith('>') || t.startsWith('<!--')) continue;
-    if (metaRe.test(t)) continue;
-    const text = t.replace(/[`*_]/g, '');
-    if (text.length > 8) return text.slice(0, MAX_ABSTRACT_CHARS);
+    if (META_LINE_RE.test(t)) continue;
+    const text = t
+      .replace(/^[-*+]\s+/, '') // list bullet
+      .replace(/[`*_]/g, '')
+      .trim();
+    if (text.length === 0) continue;
+    parts.push(text);
+    const joined = parts.join(' ');
+    // A trailing colon is a lead-in ("Use this for:") that says nothing on its
+    // own — keep folding in what it introduces until the line has content.
+    if (joined.length >= 24 && !/[:：]$/.test(joined)) return joined.slice(0, MAX_ABSTRACT_CHARS);
+    if (parts.length >= 4) return joined.slice(0, MAX_ABSTRACT_CHARS);
   }
-  return fallbackTitle;
+  return parts.length > 0 ? parts.join(' ').slice(0, MAX_ABSTRACT_CHARS) : fallbackTitle;
 }
 
 function slugify(name: string): string {

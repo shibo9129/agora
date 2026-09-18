@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LoadGate, Skeleton, usePageLoad } from '../components/LoadState';
 import {
   toolsApi,
   type AgentDetection,
@@ -312,7 +313,7 @@ function SkillsMatrix({
                   const loc = skill.locations.find((l) => l.agent === agent);
                   if (loc?.kind === 'real') {
                     return (
-                      <td key={agent} className="px-2 py-2 text-center" title={`实体安装：${loc.path}（实体文件不通过勾选管理）`}>
+                      <td key={agent} className="whitespace-nowrap px-2 py-2 text-center" title={`实体安装：${loc.path}（实体文件不通过勾选管理）`}>
                         <span className="text-xs text-emerald-500">实体</span>
                       </td>
                     );
@@ -641,13 +642,16 @@ export function ToolsPage() {
     setDetections(ag.agents);
   }, []);
 
+  const loadState = usePageLoad(load);
+  const { run: reload } = loadState;
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void reload();
+  }, [reload]);
 
   // Live reload when agents are (un)enrolled or health data changes.
   useHubEvents({
-    onAgentsUpdated: () => void load(),
+    onAgentsUpdated: () => void reload(),
   });
 
   // Only agents actually installed on this machine get columns / action slots.
@@ -687,9 +691,9 @@ export function ToolsPage() {
           <nav className="flex gap-0.5 rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-1">
             {(
               [
-                ['skills', `Skills (${skills.length})`],
-                ['mcp', `MCP (${servers.length})`],
-                ['health', `健康 (${issues.length})`],
+                ['skills', loadState.loaded ? `Skills (${skills.length})` : 'Skills'],
+                ['mcp', loadState.loaded ? `MCP (${servers.length})` : 'MCP'],
+                ['health', loadState.loaded ? `健康 (${issues.length})` : '健康'],
               ] as const
             ).map(([t, label]) => (
               <button key={t} onClick={() => setTab(t)} className={tab === t ? 'nav-tab nav-tab-active' : 'nav-tab'}>
@@ -727,29 +731,35 @@ export function ToolsPage() {
         </div>
       </div>
 
-      {toast && <div className="mb-4 rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel-strong)]/80 p-3 text-sm text-[var(--color-ink)]">{toast}</div>}
-
-      {tab === 'skills' && (
-        <>
-          <StorePanel installed={installed} statuses={statuses} onChanged={() => void load()} onError={showToast} />
-          <SkillsMatrix skills={skills} agents={linkableAgents} onChanged={() => void load()} onError={showToast} />
-        </>
-      )}
-      {tab === 'mcp' && <McpPanel servers={servers} writable={writableAgents} detections={detections} onChanged={() => void load()} onError={showToast} />}
-      {tab === 'health' && (
-        <HealthPanel
-          issues={issues}
-          onPrune={() => {
-            void toolsApi.pruneSkills().then((r) => {
-              showToast(`已清理 ${r.removed.length} 个失效链接`);
-              void load();
-            });
-          }}
-        />
+      {(toast ?? (loadState.loaded ? loadState.error : null)) && (
+        <div className="mb-4 rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel-strong)]/80 p-3 text-sm text-[var(--color-ink)]">
+          {toast ?? `刷新失败：${loadState.error ?? ''}`}
+        </div>
       )}
 
-      {showRegistry && <RegistryDialog writable={writableAgents} onClose={() => setShowRegistry(false)} onInstalled={() => void load()} onError={showToast} />}
-      {showInstall && <InstallDialog linkable={linkableAgents} onClose={() => setShowInstall(false)} onInstalled={() => void load()} onError={showToast} />}
+      <LoadGate state={loadState} skeleton={<Skeleton rows={8} className="mt-2" />}>
+        {tab === 'skills' && (
+          <>
+            <StorePanel installed={installed} statuses={statuses} onChanged={() => void reload()} onError={showToast} />
+            <SkillsMatrix skills={skills} agents={linkableAgents} onChanged={() => void reload()} onError={showToast} />
+          </>
+        )}
+        {tab === 'mcp' && <McpPanel servers={servers} writable={writableAgents} detections={detections} onChanged={() => void reload()} onError={showToast} />}
+        {tab === 'health' && (
+          <HealthPanel
+            issues={issues}
+            onPrune={() => {
+              void toolsApi.pruneSkills().then((r) => {
+                showToast(`已清理 ${r.removed.length} 个失效链接`);
+                void reload();
+              });
+            }}
+          />
+        )}
+      </LoadGate>
+
+      {showRegistry && <RegistryDialog writable={writableAgents} onClose={() => setShowRegistry(false)} onInstalled={() => void reload()} onError={showToast} />}
+      {showInstall && <InstallDialog linkable={linkableAgents} onClose={() => setShowInstall(false)} onInstalled={() => void reload()} onError={showToast} />}
     </div>
   );
 }

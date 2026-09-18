@@ -7,6 +7,7 @@
  * so unenroll can cleanly remove exactly what we added.
  */
 
+import type { AdapterEnv } from '@agora/adapters';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -22,8 +23,19 @@ export interface ManagedBlock {
   present: boolean;
 }
 
-function manifestPath(): string {
-  const home = process.env['AGORA_HOME'] ?? join(homedir(), '.agora');
+/**
+ * Where the ownership manifest lives — under the SAME home the caller is
+ * enrolling into. Resolving it from the process environment instead meant a
+ * run against a sandboxed home (tests, a second profile) recorded its blocks
+ * in the real ~/.agora, so unenroll there found nothing to remove and the real
+ * manifest filled up with paths that never existed on this machine.
+ */
+function manifestPath(env?: AdapterEnv): string {
+  const home =
+    env?.env?.['AGORA_HOME'] ??
+    (env?.home !== undefined
+      ? join(env.home, '.agora')
+      : (process.env['AGORA_HOME'] ?? join(homedir(), '.agora')));
   return join(home, 'hub-manifest.json');
 }
 
@@ -32,9 +44,9 @@ export interface OwnershipManifest {
   files: Record<string, string[]>;
 }
 
-export async function readManifest(): Promise<OwnershipManifest> {
+export async function readManifest(env?: AdapterEnv): Promise<OwnershipManifest> {
   try {
-    const raw = await readFile(manifestPath(), 'utf-8');
+    const raw = await readFile(manifestPath(env), 'utf-8');
     const parsed = JSON.parse(raw) as OwnershipManifest;
     if (parsed && typeof parsed === 'object' && parsed.files && typeof parsed.files === 'object') return parsed;
   } catch {
@@ -43,27 +55,27 @@ export async function readManifest(): Promise<OwnershipManifest> {
   return { files: {} };
 }
 
-async function writeManifest(m: OwnershipManifest): Promise<void> {
-  await mkdir(dirname(manifestPath()), { recursive: true });
-  await writeFile(manifestPath(), JSON.stringify(m, null, 2) + '\n', 'utf-8');
+async function writeManifest(m: OwnershipManifest, env?: AdapterEnv): Promise<void> {
+  await mkdir(dirname(manifestPath(env)), { recursive: true });
+  await writeFile(manifestPath(env), JSON.stringify(m, null, 2) + '\n', 'utf-8');
 }
 
-async function recordBlock(filePath: string, blockId: string): Promise<void> {
-  const m = await readManifest();
+async function recordBlock(filePath: string, blockId: string, env?: AdapterEnv): Promise<void> {
+  const m = await readManifest(env);
   const list = m.files[filePath] ?? [];
   if (!list.includes(blockId)) {
     list.push(blockId);
     m.files[filePath] = list;
-    await writeManifest(m);
+    await writeManifest(m, env);
   }
 }
 
-async function dropBlock(filePath: string, blockId: string): Promise<void> {
-  const m = await readManifest();
+async function dropBlock(filePath: string, blockId: string, env?: AdapterEnv): Promise<void> {
+  const m = await readManifest(env);
   const list = (m.files[filePath] ?? []).filter((b) => b !== blockId);
   if (list.length === 0) delete m.files[filePath];
   else m.files[filePath] = list;
-  await writeManifest(m);
+  await writeManifest(m, env);
 }
 
 async function backup(path: string): Promise<string> {
@@ -95,12 +107,13 @@ export async function upsertManagedBlock(
   filePath: string,
   blockId: string,
   body: string,
+  env?: AdapterEnv,
 ): Promise<{ action: 'inserted' | 'replaced' | 'noop'; backupPath?: string }> {
   const block = `${BEGIN(blockId)}\n${body.trim()}\n${END(blockId)}`;
   if (!existsSync(filePath)) {
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `${block}\n`, 'utf-8');
-    await recordBlock(filePath, blockId);
+    await recordBlock(filePath, blockId, env);
     return { action: 'inserted' };
   }
   const content = await readFile(filePath, 'utf-8');
@@ -125,7 +138,7 @@ export async function upsertManagedBlock(
     next = `${content}${sep}${block}\n`;
   }
   await writeFile(filePath, next, 'utf-8');
-  await recordBlock(filePath, blockId);
+  await recordBlock(filePath, blockId, env);
   return { action: hasManagedBlock(content, blockId) ? 'replaced' : 'inserted', backupPath };
 }
 
@@ -133,6 +146,7 @@ export async function upsertManagedBlock(
 export async function removeManagedBlock(
   filePath: string,
   blockId: string,
+  env?: AdapterEnv,
 ): Promise<{ action: 'removed' | 'noop'; backupPath?: string }> {
   if (!existsSync(filePath)) return { action: 'noop' };
   const content = await readFile(filePath, 'utf-8');
@@ -149,12 +163,12 @@ export async function removeManagedBlock(
   // Collapse >2 consecutive blank lines left behind.
   next = next.replace(/\n{3,}/g, '\n\n');
   await writeFile(filePath, next, 'utf-8');
-  await dropBlock(filePath, blockId);
+  await dropBlock(filePath, blockId, env);
   return { action: 'removed', backupPath };
 }
 
-export async function listManagedBlocks(): Promise<ManagedBlock[]> {
-  const m = await readManifest();
+export async function listManagedBlocks(env?: AdapterEnv): Promise<ManagedBlock[]> {
+  const m = await readManifest(env);
   const out: ManagedBlock[] = [];
   for (const [filePath, blockIds] of Object.entries(m.files)) {
     let content = '';

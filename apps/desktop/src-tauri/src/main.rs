@@ -45,6 +45,30 @@ fn show_window(app: &tauri::AppHandle, path: &str) {
     }
 }
 
+/// Switch sections from a menu the way the app itself does — set the hash and
+/// let React re-render. `navigate()` would reload the whole webview (white
+/// flash, every panel refetched) just to move between two tabs, which is
+/// exactly how a wrapped web page behaves and a native app does not.
+fn go_to_section(app: &tauri::AppHandle, section: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval(&format!(
+            "window.location.hash='/{section}';window.dispatchEvent(new CustomEvent('agora:nav',{{detail:'{section}'}}))"
+        ));
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+/// Open the settings panel (same entry point as the in-app ⌘, handler).
+fn open_settings(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval("window.dispatchEvent(new Event('agora:toggle-settings'))");
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn build_tray(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
     let open = MenuItem::with_id(app, "open", "打开 Agora", true, None::<&str>)?;
     let usage = MenuItem::with_id(app, "usage", "用量看板", true, None::<&str>)?;
@@ -62,8 +86,8 @@ fn build_tray(app: &tauri::AppHandle) -> Result<(), tauri::Error> {
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_window(app, "/"),
-            "usage" => show_window(app, "/#/usage"),
-            "memory" => show_window(app, "/#/memory"),
+            "usage" => go_to_section(app, "usage"),
+            "memory" => go_to_section(app, "memory"),
             "quit" => {
                 app.exit(0);
             }
@@ -83,6 +107,8 @@ fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> 
         true,
         &[
             &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "nav:settings", "设置…", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::services(app, None)?,
             &PredefinedMenuItem::separator(app)?,
@@ -121,10 +147,23 @@ fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> 
         ],
     )?;
 
-    Menu::with_items(app, &[&app_menu, &edit_menu, &window_menu])
-}
+    // The sections already answer to ⌘1..⌘4 in the frontend; listing them here
+    // is what makes those shortcuts discoverable (and gives the menu bar the
+    // shape people expect from a Mac app).
+    let view_menu = Submenu::with_items(
+        app,
+        "视图",
+        true,
+        &[
+            &MenuItem::with_id(app, "nav:usage", "用量看板", true, Some("CmdOrCtrl+1"))?,
+            &MenuItem::with_id(app, "nav:kb", "知识库", true, Some("CmdOrCtrl+2"))?,
+            &MenuItem::with_id(app, "nav:tools", "工具中心", true, Some("CmdOrCtrl+3"))?,
+            &MenuItem::with_id(app, "nav:memory", "记忆中枢", true, Some("CmdOrCtrl+4"))?,
+        ],
+    )?;
 
-fn home_dir_unused() {}
+    Menu::with_items(app, &[&app_menu, &edit_menu, &view_menu, &window_menu])
+}
 
 fn pick_free_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
@@ -173,6 +212,14 @@ fn wait_ready(port: u16, timeout: Duration) -> bool {
 
 fn main() {
     tauri::Builder::default()
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "nav:settings" => open_settings(app),
+            id => {
+                if let Some(section) = id.strip_prefix("nav:") {
+                    go_to_section(app, section);
+                }
+            }
+        })
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
             // Second launch: focus the existing window instead of spawning
             // a new sidecar (the plugin terminates this new process for us).

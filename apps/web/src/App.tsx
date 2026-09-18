@@ -15,6 +15,7 @@ import {
   type UsageTotals,
 } from './api';
 import { Chart } from './components/Chart';
+import { LoadGate, usePageLoad } from './components/LoadState';
 import type { KnowledgeBase } from './kb/api';
 import { useCountUp } from './hooks/useCountUp';
 import { useHubEvents } from './hooks/useHubEvents';
@@ -83,6 +84,18 @@ export default function App() {
     setOpenKb(null);
     window.location.hash = '/kb';
   }, []);
+
+  // The native menu bar (视图 menu, tray) drives navigation through this event
+  // rather than window.navigate(), so switching sections from the menu is the
+  // same in-app transition as clicking the sidebar — no reload.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const section = (e as CustomEvent<string>).detail;
+      if (section === 'usage' || section === 'kb' || section === 'tools' || section === 'memory') goto(section);
+    };
+    window.addEventListener('agora:nav', onNav);
+    return () => window.removeEventListener('agora:nav', onNav);
+  }, [goto]);
 
   // macOS-native chrome: Cmd+1..4 switches sections, Cmd+, opens settings —
   // without these a Tauri window just feels like a webpage, not an app.
@@ -215,40 +228,41 @@ function UsageDashboard() {
   const [lastReport, setLastReport] = useState<CollectionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Rejections propagate to usePageLoad (skeleton → content → error), instead
+  // of being swallowed into a banner the empty state contradicts.
   const load = useCallback(async () => {
-    try {
-      const d = days === 0 ? undefined : days;
-      const [s, a, m, p, dy, ag, hy] = await Promise.all([
-        api.summary(d),
-        api.byAgent(d),
-        api.byModel(d),
-        api.byProject(d),
-        api.daily(days === 0 ? 3650 : days),
-        api.agents(),
-        // Intraday series only needed on the 今天 view; still cheap to fetch.
-        days === 1 ? api.hourly() : Promise.resolve({ rows: [] }),
-      ]);
-      setSummary(s);
-      setByAgent(a.rows);
-      setByModel(m.rows);
-      setByProject(p.rows);
-      setDaily(dy.rows);
-      setAgents(ag.agents);
-      setHourly(hy.rows);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    const d = days === 0 ? undefined : days;
+    const [s, a, m, p, dy, ag, hy] = await Promise.all([
+      api.summary(d),
+      api.byAgent(d),
+      api.byModel(d),
+      api.byProject(d),
+      api.daily(days === 0 ? 3650 : days),
+      api.agents(),
+      // Intraday series only needed on the 今天 view; still cheap to fetch.
+      days === 1 ? api.hourly() : Promise.resolve({ rows: [] }),
+    ]);
+    setSummary(s);
+    setByAgent(a.rows);
+    setByModel(m.rows);
+    setByProject(p.rows);
+    setDaily(dy.rows);
+    setAgents(ag.agents);
+    setHourly(hy.rows);
+    setError(null);
   }, [days]);
 
+  const loadState = usePageLoad(load);
+  const { run: reload } = loadState;
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void reload();
+  }, [reload]);
 
   // Live: hub pushes usage-updated when new agent data lands (real-time watch).
   useHubEvents({
-    onUsageUpdated: () => void load(),
-    onAgentsUpdated: () => void load(),
+    onUsageUpdated: () => void reload(),
+    onAgentsUpdated: () => void reload(),
   });
 
   const onCollect = async () => {
@@ -256,7 +270,7 @@ function UsageDashboard() {
     try {
       const report = await api.collect();
       setLastReport(report);
-      await load();
+      await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -384,9 +398,9 @@ function UsageDashboard() {
         </button>
       </div>
 
-      {error && (
+      {(error ?? (loadState.loaded ? loadState.error : null)) && (
         <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/40 p-3 text-sm text-red-300">
-          {error}（请确认 agora server 已在 127.0.0.1:7878 运行）
+          {error ?? loadState.error}
         </div>
       )}
 
@@ -397,6 +411,22 @@ function UsageDashboard() {
         </div>
       )}
 
+      <LoadGate
+        state={loadState}
+        skeleton={
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="skeleton h-28" />
+              ))}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="skeleton h-72" />
+              <div className="skeleton h-72" />
+            </div>
+          </div>
+        }
+      >
       <section className="stagger mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard
           title="总成本"
@@ -535,6 +565,7 @@ function UsageDashboard() {
           </div>
         </div>
       </section>
+      </LoadGate>
     </div>
   );
 }
